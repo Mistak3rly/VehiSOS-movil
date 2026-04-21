@@ -73,13 +73,15 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) {
         return;
       }
+      debugPrint('Login error: $error');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error.message)),
       );
-    } catch (_) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
+      debugPrint('Unexpected login error: $error');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No se pudo iniciar sesión.')),
       );

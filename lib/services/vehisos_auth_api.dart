@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -123,6 +124,15 @@ class VehiSOSAuthApi {
         if (detail is String) {
           return detail;
         }
+        if (detail is List && detail.isNotEmpty) {
+          final first = detail.first;
+          if (first is Map<String, dynamic>) {
+            final msg = first['msg'];
+            if (msg is String && msg.isNotEmpty) {
+              return msg;
+            }
+          }
+        }
       }
     } catch (_) {
       // Fall back to the raw body below.
@@ -168,14 +178,27 @@ class VehiSOSAuthApi {
     required String identificador,
     required String password,
   }) async {
-    final response = await _client.post(
-      _uri('/api/v1/usuarios/login'),
-      headers: _jsonHeaders(),
-      body: jsonEncode({
-        'identificador': identificador,
-        'password': password,
-      }),
-    );
+    late final http.Response response;
+    try {
+      response = await _client
+          .post(
+            _uri('/api/v1/usuarios/login'),
+            headers: _jsonHeaders(),
+            body: jsonEncode({
+              'identificador': identificador,
+              'password': password,
+            }),
+          )
+          .timeout(const Duration(seconds: 12));
+    } on TimeoutException {
+      throw VehiSosApiException(
+        'Tiempo de espera agotado al conectar con el servidor ($baseUrl).',
+      );
+    } catch (_) {
+      throw VehiSosApiException(
+        'No se pudo conectar con el servidor ($baseUrl). Verifica que el backend este activo.',
+      );
+    }
 
     if (response.statusCode != 200) {
       throw VehiSosApiException(
@@ -184,11 +207,23 @@ class VehiSOSAuthApi {
       );
     }
 
-    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    return VehiSosAuthSession(
-      token: decoded['access_token'] as String,
-      user: VehiSosUser.fromJson(decoded['user'] as Map<String, dynamic>),
-    );
+    try {
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final token = decoded['access_token'];
+      final user = decoded['user'];
+      if (token is! String || user is! Map<String, dynamic>) {
+        throw const FormatException('Respuesta de login incompleta');
+      }
+      return VehiSosAuthSession(
+        token: token,
+        user: VehiSosUser.fromJson(user),
+      );
+    } catch (error) {
+      throw VehiSosApiException(
+        'El servidor respondio el login, pero la app no pudo leer la sesion: $error',
+        statusCode: response.statusCode,
+      );
+    }
   }
 
   Future<VehiSosUser> updateCurrentUser({
