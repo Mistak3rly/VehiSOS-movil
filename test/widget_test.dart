@@ -21,7 +21,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 800));
 
     expect(find.text('VehiSOS'), findsOneWidget);
-    expect(find.text('Sign In'), findsOneWidget);
-    expect(find.text('Create Account'), findsOneWidget);
+    expect(find.text('Iniciar Sesion'), findsOneWidget);
+    expect(find.text('Crear Cuenta'), findsOneWidget);
   });
 }

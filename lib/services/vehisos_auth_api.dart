@@ -22,6 +22,7 @@ class VehiSosUser {
     required this.correo,
     required this.documentoIdentidad,
     required this.activo,
+    required this.roles,
     this.telefono,
   });
 
@@ -31,6 +32,7 @@ class VehiSosUser {
   final String correo;
   final String documentoIdentidad;
   final bool activo;
+  final List<String> roles;
   final String? telefono;
 
   factory VehiSosUser.fromJson(Map<String, dynamic> json) {
@@ -41,6 +43,15 @@ class VehiSosUser {
       correo: json['correo'] as String? ?? '',
       documentoIdentidad: json['documento_identidad'] as String? ?? '',
       activo: json['activo'] as bool? ?? false,
+      roles: (json['roles'] as List<dynamic>? ?? <dynamic>[])
+          .map((role) {
+            if (role is Map<String, dynamic>) {
+              return role['nombre'] as String? ?? '';
+            }
+            return '';
+          })
+          .where((name) => name.isNotEmpty)
+          .toList(growable: false),
       telefono: json['telefono'] as String?,
     );
   }
@@ -48,6 +59,13 @@ class VehiSosUser {
   String get displayName {
     final fullName = '$nombre $apellidos'.trim();
     return fullName.isEmpty ? correo : fullName;
+  }
+
+  bool get isClientProfile {
+    return roles.any((role) {
+      final normalized = role.toLowerCase();
+      return normalized == 'cliente' || normalized.contains('client');
+    });
   }
 }
 
@@ -173,6 +191,37 @@ class VehiSOSAuthApi {
     );
   }
 
+  Future<VehiSosUser> updateCurrentUser({
+    required String token,
+    required int userId,
+    String? nombre,
+    String? apellidos,
+    String? correo,
+    String? telefono,
+    String? documentoIdentidad,
+  }) async {
+    final response = await _client.put(
+      _uri('/api/v1/usuarios/$userId'),
+      headers: _jsonHeaders(token: token),
+      body: jsonEncode({
+        if (nombre != null) 'nombre': nombre,
+        if (apellidos != null) 'apellidos': apellidos,
+        if (correo != null) 'correo': correo,
+        if (telefono != null) 'telefono': telefono,
+        if (documentoIdentidad != null) 'documento_identidad': documentoIdentidad,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw VehiSosApiException(
+        _extractErrorMessage(response),
+        statusCode: response.statusCode,
+      );
+    }
+
+    return VehiSosUser.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
   Future<VehiSosUser> fetchCurrentUser(String token) async {
     final response = await _client.get(
       _uri('/api/v1/usuarios/me'),
@@ -236,6 +285,9 @@ class VehiSosSessionStore {
       'documento_identidad': user.documentoIdentidad,
       'telefono': user.telefono,
       'activo': user.activo,
+      'roles': user.roles
+          .map((role) => <String, dynamic>{'nombre': role})
+          .toList(growable: false),
     };
   }
 }
