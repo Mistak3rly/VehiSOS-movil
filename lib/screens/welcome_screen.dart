@@ -130,7 +130,7 @@ class WelcomeScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 18),
                           Text(
-                            '© 2024 VEHISOS GLOBAL SENTINEL',
+                            '© 2026 VEHISOS GLOBAL SENTINEL',
                             style: GoogleFonts.workSans(
                               fontSize: 13,
                               color: Colors.white.withValues(alpha: 0.65),

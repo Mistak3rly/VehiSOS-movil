@@ -5,6 +5,11 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val googleMapsApiKey =
+    (project.findProperty("GOOGLE_MAPS_API_KEY") as String?)
+        ?: System.getenv("GOOGLE_MAPS_API_KEY")
+        ?: ""
+
 android {
     namespace = "com.example.vehisos_movil"
     compileSdk = flutter.compileSdkVersion
@@ -28,6 +33,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = googleMapsApiKey
     }
 
     buildTypes {

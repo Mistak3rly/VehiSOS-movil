@@ -45,5 +45,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>VehiSOS necesita acceso al micrófono para enviar mensajes de audio.</string>
 </dict>
 </plist>

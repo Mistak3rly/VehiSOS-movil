@@ -1,6 +1,6 @@
 part of '../client_home_screen.dart';
 
-class _ProfileTab extends StatelessWidget {
+class _ProfileTab extends StatefulWidget {
   const _ProfileTab({required this.user, required this.onEditProfile, required this.onLogout, required this.onOpenNotifications});
 
   final VehiSosUser user;
@@ -9,32 +9,241 @@ class _ProfileTab extends StatelessWidget {
   final VoidCallback onOpenNotifications;
 
   @override
+  State<_ProfileTab> createState() => _ProfileTabState();
+}
+
+class _ProfileTabState extends State<_ProfileTab> {
+  static const List<IconData> _maleAvatars = <IconData>[
+    Icons.face_6_rounded,
+    Icons.person_rounded,
+    Icons.sports_motorsports_rounded,
+  ];
+  static const List<IconData> _femaleAvatars = <IconData>[
+    Icons.face_4_rounded,
+    Icons.person_2_rounded,
+    Icons.support_agent_rounded,
+  ];
+  static const List<IconData> _neutralAvatars = <IconData>[
+    Icons.account_circle_rounded,
+    Icons.person_outline_rounded,
+    Icons.emoji_people_rounded,
+  ];
+
+  String _selectedGender = 'neutral';
+  int _selectedAvatarIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAvatarPreferences();
+  }
+
+  Future<void> _loadAvatarPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    final gender = prefs.getString(_genderKey) ?? _selectedGender;
+    final avatarIndex = prefs.getInt(_avatarKey) ?? _selectedAvatarIndex;
+    final clampedIndex = avatarIndex.clamp(0, _avatarsForGender(gender).length - 1);
+
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _selectedGender = gender;
+      _selectedAvatarIndex = clampedIndex;
+    });
+  }
+
+  Future<void> _saveAvatarPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_genderKey, _selectedGender);
+    await prefs.setInt(_avatarKey, _selectedAvatarIndex);
+  }
+
+  String get _genderKey => 'vehisos_profile_gender_${widget.user.id}';
+  String get _avatarKey => 'vehisos_profile_avatar_${widget.user.id}';
+
+  List<IconData> _avatarsForGender(String gender) {
+    switch (gender) {
+      case 'male':
+        return _maleAvatars;
+      case 'female':
+        return _femaleAvatars;
+      default:
+        return _neutralAvatars;
+    }
+  }
+
+  IconData get _currentAvatarIcon {
+    final avatars = _avatarsForGender(_selectedGender);
+    return avatars[_selectedAvatarIndex];
+  }
+
+  Future<void> _openAvatarEditor() async {
+    var tempGender = _selectedGender;
+    var tempAvatarIndex = _selectedAvatarIndex;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFFFDF1EF),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final avatarOptions = _avatarsForGender(tempGender);
+            if (tempAvatarIndex >= avatarOptions.length) {
+              tempAvatarIndex = 0;
+            }
+
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Editar avatar',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: BrandColors.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Elige genero y estilo de avatar para tu perfil.',
+                      style: GoogleFonts.workSans(
+                        fontSize: 14,
+                        color: BrandColors.onSurface.withValues(alpha: 0.75),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _AvatarGenderChip(
+                          label: 'Masculino',
+                          selected: tempGender == 'male',
+                          onTap: () => setModalState(() {
+                            tempGender = 'male';
+                            tempAvatarIndex = 0;
+                          }),
+                        ),
+                        _AvatarGenderChip(
+                          label: 'Femenino',
+                          selected: tempGender == 'female',
+                          onTap: () => setModalState(() {
+                            tempGender = 'female';
+                            tempAvatarIndex = 0;
+                          }),
+                        ),
+                        _AvatarGenderChip(
+                          label: 'Otro',
+                          selected: tempGender == 'neutral',
+                          onTap: () => setModalState(() {
+                            tempGender = 'neutral';
+                            tempAvatarIndex = 0;
+                          }),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: avatarOptions.length,
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        mainAxisSpacing: 12,
+                        crossAxisSpacing: 12,
+                        childAspectRatio: 1,
+                      ),
+                      itemBuilder: (context, index) {
+                        final selected = tempAvatarIndex == index;
+                        return GestureDetector(
+                          onTap: () => setModalState(() => tempAvatarIndex = index),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: selected ? const Color(0xFFFFE1DD) : Colors.white,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: selected ? BrandColors.primary : const Color(0xFFFFC9C2),
+                                width: selected ? 2 : 1,
+                              ),
+                            ),
+                            child: Icon(
+                              avatarOptions[index],
+                              size: 42,
+                              color: selected ? BrandColors.primary : BrandColors.onSurface,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    GradientActionButton(
+                      label: 'Guardar Avatar',
+                      onTap: () async {
+                        setState(() {
+                          _selectedGender = tempGender;
+                          _selectedAvatarIndex = tempAvatarIndex;
+                        });
+                        await _saveAvatarPreferences();
+                        if (!context.mounted) {
+                          return;
+                        }
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 130),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _BrandTopBar(onNotificationsTap: onOpenNotifications),
+          _BrandTopBar(onNotificationsTap: widget.onOpenNotifications),
           const SizedBox(height: 20),
           Row(
             children: [
               Stack(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(26),
-                    child: Image.network(
-                      'https://lh3.googleusercontent.com/aida-public/AB6AXuC6aGXc0On5yOa9uLICpluJMtu9RzDA1tqivrHJW6n_xvY9zhCv49iErQ7t8QMMU43Z17Cx4hz_LkgATOLYLXJfS3WTDbquuRACzQ-V4JAMwda6-MH4_ZAUjK7CVg63Q-ol7McJrOOftrt4H8tVXP8wqhTYUg4k2SrNy1fAsYNmOxxHFoVhdKwA7lusqjAiqnSUeU3MR3cBdbyee4_n4p38rH13PbJkDlPf0wdOD8UrKdV7le1dbqkuPuTyJ_O1CgHJLjCrZFjBWCM',
-                      width: 116,
-                      height: 116,
-                      fit: BoxFit.cover,
+                  Container(
+                    width: 116,
+                    height: 116,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(26),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFFFFE2DE), Color(0xFFFFF4F2)],
+                      ),
+                      border: Border.all(color: const Color(0xFFFFC9C2), width: 1.2),
+                    ),
+                    child: Icon(
+                      _currentAvatarIcon,
+                      size: 68,
+                      color: BrandColors.primary,
                     ),
                   ),
                   Positioned(
                     right: -3,
                     bottom: -3,
                     child: GestureDetector(
-                      onTap: onEditProfile,
+                      onTap: _openAvatarEditor,
                       child: Container(
                         width: 54,
                         height: 54,
@@ -57,7 +266,7 @@ class _ProfileTab extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      user.displayName,
+                      widget.user.displayName,
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 54 * 0.6,
                         color: BrandColors.onSurface,
@@ -67,7 +276,7 @@ class _ProfileTab extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      user.correo,
+                      widget.user.correo,
                       style: GoogleFonts.workSans(
                         fontSize: 35 * 0.48,
                         color: BrandColors.onSurface.withValues(alpha: 0.8),
@@ -94,7 +303,7 @@ class _ProfileTab extends StatelessWidget {
             decoration: BoxDecoration(color: const Color(0xFFFDECE9), borderRadius: BorderRadius.circular(26)),
             child: Column(
               children: [
-                _ProfileMenuItem(icon: Icons.person_rounded, label: 'Manage Profile', onTap: onEditProfile),
+                _ProfileMenuItem(icon: Icons.person_rounded, label: 'Manage Profile', onTap: widget.onEditProfile),
                 const _ProfileMenuItem(icon: Icons.shield_rounded, label: 'Password & Security'),
                 const _ProfileMenuItem(icon: Icons.notifications_active_rounded, label: 'Notifications'),
                 const _ProfileMenuItem(icon: Icons.language_rounded, label: 'Language', subtitle: 'English (US)'),
@@ -129,7 +338,7 @@ class _ProfileTab extends StatelessWidget {
           ),
           const SizedBox(height: 28),
           GestureDetector(
-            onTap: onLogout,
+            onTap: widget.onLogout,
             child: Container(
               height: 82,
               decoration: BoxDecoration(
@@ -156,6 +365,36 @@ class _ProfileTab extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AvatarGenderChip extends StatelessWidget {
+  const _AvatarGenderChip({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? BrandColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: selected ? BrandColors.primary : const Color(0xFFFFC9C2)),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.workSans(
+            fontWeight: FontWeight.w700,
+            color: selected ? Colors.white : BrandColors.onSurface,
+          ),
+        ),
       ),
     );
   }

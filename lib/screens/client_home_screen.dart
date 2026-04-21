@@ -1,8 +1,17 @@
+import 'package:file_picker/file_picker.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:flutter_sound_record/flutter_sound_record.dart';
 
 import '../services/vehisos_auth_api.dart';
+import '../services/workshop_assistant_service.dart';
 import '../theme/brand_colors.dart';
+import '../widgets/common_widgets.dart';
 import 'auth_gate.dart';
 import 'client_profile_screen.dart';
 
@@ -92,7 +101,10 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                         onOpenStatus: () => setState(() => _currentIndex = 1),
                         onOpenNotifications: _openNotifications,
                       ),
-                _TrackingStatusTab(onOpenNotifications: _openNotifications),
+                _TrackingStatusTab(
+                  initialToken: widget.initialToken,
+                  onOpenNotifications: _openNotifications,
+                ),
                 _ProfileTab(
                   user: displayUser,
                   onEditProfile: () => _openProfileEditor(context, displayUser),
