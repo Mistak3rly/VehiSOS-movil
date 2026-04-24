@@ -1,178 +1,363 @@
 part of '../client_home_screen.dart';
 
-class HistoryTab extends StatelessWidget {
-  const HistoryTab({super.key, required this.onOpenNotifications});
+class HistoryTab extends StatefulWidget {
+  const HistoryTab({
+    super.key,
+    required this.onOpenNotifications,
+    required this.history,
+    this.onLoadMore,
+    this.onFilterByCategory,
+    this.currentFilter = 'todos',
+    this.hasMorePages = false,
+  });
 
   final VoidCallback onOpenNotifications;
+  final List<ClientHistoryEntry> history;
+  final Future<void> Function()? onLoadMore;
+  final Future<void> Function(String category)? onFilterByCategory;
+  final String currentFilter;
+  final bool hasMorePages;
+
+  @override
+  State<HistoryTab> createState() => _HistoryTabState();
+}
+
+class _HistoryTabState extends State<HistoryTab> {
+  late ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent) {
+      if (widget.hasMorePages) {
+        widget.onLoadMore?.call();
+      }
+    }
+  }
+
+  IconData _iconForCategory(String category) {
+    switch (category) {
+      case 'payment':
+        return Icons.payments_rounded;
+      case 'garage':
+        return Icons.directions_car_filled_rounded;
+      case 'workshop':
+        return Icons.support_agent_rounded;
+      case 'chat':
+        return Icons.chat_rounded;
+      default:
+        return Icons.history_rounded;
+    }
+  }
+
+  Color _accentForCategory(String category) {
+    switch (category) {
+      case 'payment':
+        return const Color(0xFF0D8F43);
+      case 'garage':
+        return const Color(0xFF1457A7);
+      case 'workshop':
+        return BrandColors.primary;
+      case 'chat':
+        return const Color(0xFF7A4B1F);
+      default:
+        return BrandColors.onSurface;
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final year = date.year;
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '$day/$month/$year • $hour:$minute';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final categories = ['todos', 'payment', 'garage', 'workshop', 'chat'];
+    final categoryLabels = {
+      'todos': 'Todos',
+      'payment': 'Pagos',
+      'garage': 'Garage',
+      'workshop': 'Talleres',
+      'chat': 'Chat',
+    };
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F3F2),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 128),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _HistoryTopBar(onNotificationsTap: onOpenNotifications),
-              const SizedBox(height: 30),
-              Text('OVERVIEW', style: GoogleFonts.workSans(color: BrandColors.primary, fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 2.4)),
-              const SizedBox(height: 6),
-              Text('Your Incident\nArchive.', style: GoogleFonts.plusJakartaSans(color: BrandColors.onSurface, fontWeight: FontWeight.w800, fontSize: 50 * 0.72, height: 0.95)),
-              const SizedBox(height: 20),
-              Container(
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28), boxShadow: const [BoxShadow(color: Color(0x14291714), blurRadius: 24, offset: Offset(0, 10))]),
-                child: Column(
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+        child: CustomScrollView(
+          controller: _scrollController,
+          slivers: [
+            SliverList(
+              delegate: SliverChildListDelegate([
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                  child: _HistoryTopBar(onNotificationsTap: widget.onOpenNotifications),
+                ),
+                const SizedBox(height: 22),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    'Historial del cliente',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 34,
+                      fontWeight: FontWeight.w800,
+                      color: BrandColors.onSurface,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    'Aqui se guardan talleres contactados, pagos y acciones en la app.',
+                    style: GoogleFonts.workSans(
+                      fontSize: 14,
+                      color: BrandColors.onSurface.withValues(alpha: 0.72),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: const [
+                        BoxShadow(color: Color(0x14291714), blurRadius: 24, offset: Offset(0, 10)),
+                      ],
+                    ),
+                    child: Row(
                       children: [
-                        Container(width: 8, height: 320, decoration: const BoxDecoration(color: BrandColors.primary, borderRadius: BorderRadius.only(topLeft: Radius.circular(28), bottomLeft: Radius.circular(28)))),
                         Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(child: Text('OCT 24, 2023 • 14:22', style: GoogleFonts.workSans(fontSize: 12, color: BrandColors.onSurface.withValues(alpha: 0.55), letterSpacing: 2.2))),
-                                    Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8), decoration: BoxDecoration(color: const Color(0xFFF7D7D4), borderRadius: BorderRadius.circular(999)), child: Text('COMPLETED', style: GoogleFonts.workSans(fontSize: 10, fontWeight: FontWeight.w800, color: BrandColors.primary, letterSpacing: 1.4))),
-                                  ],
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Total de eventos',
+                                style: GoogleFonts.workSans(
+                                  color: BrandColors.onSurface.withValues(alpha: 0.65),
+                                  fontWeight: FontWeight.w700,
                                 ),
-                                const SizedBox(height: 10),
-                                Text('Emergency\nTowing', style: GoogleFonts.plusJakartaSans(fontSize: 34, fontWeight: FontWeight.w800, color: BrandColors.onSurface, height: 0.95)),
-                                const SizedBox(height: 18),
-                                Text('LOCATION', style: GoogleFonts.workSans(fontSize: 11, color: BrandColors.onSurface.withValues(alpha: 0.55), letterSpacing: 1.4)),
-                                const SizedBox(height: 3),
-                                Text('I-95 North, Exit 12', style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.w700)),
-                                const SizedBox(height: 14),
-                                Text('VEHICLE', style: GoogleFonts.workSans(fontSize: 11, color: BrandColors.onSurface.withValues(alpha: 0.55), letterSpacing: 1.4)),
-                                const SizedBox(height: 3),
-                                Text('Tesla Model 3 • ABC-1234', style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w700)),
-                                const SizedBox(height: 14),
-                                Text('COST', style: GoogleFonts.workSans(fontSize: 11, color: BrandColors.onSurface.withValues(alpha: 0.55), letterSpacing: 1.4)),
-                                const SizedBox(height: 3),
-                                Text(r'$142.50', style: GoogleFonts.plusJakartaSans(fontSize: 24, fontWeight: FontWeight.w800, color: BrandColors.primary)),
-                              ],
-                            ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${widget.history.length}',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w800,
+                                  color: BrandColors.primary,
+                                ),
+                              ),
+                            ],
                           ),
+                        ),
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFDECE9),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.timeline_rounded, color: BrandColors.primary),
                         ),
                       ],
                     ),
-                    ClipRRect(
-                      borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(28), bottomRight: Radius.circular(28)),
-                      child: Image.network(
-                        'https://lh3.googleusercontent.com/aida-public/AB6AXuAQDQQGYgiNFYuzL8plQRuQc7GlmP2JCGWWZdZNB51O0GLd7uyedXdrXUUpEhX4kMp06LL1QakLIDV_HSDeJ07U41wzZ2nMtrAwPvkUhNBmZhtLPYeyXVWDPpc___wlpyAxgy0WpNSor1Cx0bY97MnzstoynPR4GkxtKnTF8-LkjJh-_J-JVTvYw7sIUyiEuGJTZ3dDbhEOkVTLJSFqKXBweyiEGT5WJGcFbbxnRKF-AYDkElXqvvryzvfbzsJ7oTY-BY57EwaOliU',
-                        height: 150,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(color: const Color(0xFFF8D8D2), borderRadius: BorderRadius.circular(26)),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('SEP 12, 2023', style: GoogleFonts.workSans(fontSize: 12, color: BrandColors.onSurface.withValues(alpha: 0.55), letterSpacing: 2.2)),
-                          const SizedBox(height: 8),
-                          Text('Flat Tire Repair', style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.w800, color: BrandColors.onSurface)),
-                          const SizedBox(height: 18),
-                          Text('TOTAL PAID', style: GoogleFonts.workSans(fontSize: 11, color: BrandColors.onSurface.withValues(alpha: 0.55), letterSpacing: 1.4)),
-                          const SizedBox(height: 3),
-                          Text(r'$45.00', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800, color: BrandColors.onSurface)),
-                          const SizedBox(height: 10),
-                          Align(alignment: Alignment.centerRight, child: Container(padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8), decoration: BoxDecoration(color: BrandColors.onSurface, borderRadius: BorderRadius.circular(999)), child: Text('DETAILS', style: GoogleFonts.workSans(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 10, letterSpacing: 2)))),
-                        ],
-                      ),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    'Filtrar por tipo',
+                    style: GoogleFonts.workSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                      color: BrandColors.onSurface.withValues(alpha: 0.65),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(color: const Color(0xFFF8D8D2), borderRadius: BorderRadius.circular(26)),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('AUG 05, 2023', style: GoogleFonts.workSans(fontSize: 12, color: BrandColors.onSurface.withValues(alpha: 0.55), letterSpacing: 2.2)),
-                          const SizedBox(height: 8),
-                          Text('Fuel Delivery', style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.w800, color: BrandColors.onSurface)),
-                          const SizedBox(height: 18),
-                          Text('TOTAL PAID', style: GoogleFonts.workSans(fontSize: 11, color: BrandColors.onSurface.withValues(alpha: 0.55), letterSpacing: 1.4)),
-                          const SizedBox(height: 3),
-                          Text(r'$32.10', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800, color: BrandColors.onSurface)),
-                          const SizedBox(height: 10),
-                          Align(alignment: Alignment.centerRight, child: Container(padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8), decoration: BoxDecoration(color: BrandColors.onSurface, borderRadius: BorderRadius.circular(999)), child: Text('DETAILS', style: GoogleFonts.workSans(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 10, letterSpacing: 2)))),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              Container(
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), boxShadow: const [BoxShadow(color: Color(0x14291714), blurRadius: 24, offset: Offset(0, 10))]),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-                      child: Image.network('https://lh3.googleusercontent.com/aida-public/AB6AXuBgFWZniJDZ-v1ZFral1ezyCllv6oKIn8jUODTWQUXMgV6cviSAUZ199vv5BEz9F7N5S58fASA_yAIbTlRfkHOkYptwBPw8_H6i-t199S17l6_L1vOoAyE0nUgKmQKbIU3ZQY0jHSTL6USH7pflFcRuDUdsGDjLVvb5I48D5zYrKNgh6X4U6EkfUI_eHEbNjYW3smGZvwJMRqPUftGjcQ3kDSkvOUYH3pwXE24n_RKH9FyMve4t2RY3HiKp9k-JIsY_chhtf6dcd8w', height: 170, width: double.infinity, fit: BoxFit.cover),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(18),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('JUL 21, 2023', style: GoogleFonts.workSans(fontSize: 12, color: BrandColors.onSurface.withValues(alpha: 0.55), letterSpacing: 2.2)),
-                          const SizedBox(height: 8),
-                          Text('Battery Jumpstart', style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.w800, color: BrandColors.onSurface)),
-                          const SizedBox(height: 4),
-                          Text('Location: Shopping Mall Basement P2', style: GoogleFonts.workSans(fontSize: 13, color: BrandColors.onSurface.withValues(alpha: 0.72))),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('AMOUNT', style: GoogleFonts.workSans(fontSize: 11, color: BrandColors.onSurface.withValues(alpha: 0.55), letterSpacing: 1.4)),
-                                  const SizedBox(height: 3),
-                                  Text(r'$55.00', style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.w800, color: BrandColors.onSurface)),
-                                ],
-                              ),
-                              const Spacer(),
-                              const Icon(Icons.chevron_right_rounded, color: BrandColors.primary, size: 32),
-                            ],
+                ),
+                const SizedBox(height: 10),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: categories.map((cat) {
+                      final isSelected = widget.currentFilter == cat;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 10),
+                        child: FilterChip(
+                          selected: isSelected,
+                          label: Text(categoryLabels[cat] ?? cat),
+                          onSelected: (_) {
+                            widget.onFilterByCategory?.call(cat);
+                          },
+                          backgroundColor: Colors.white,
+                          selectedColor: BrandColors.primary.withValues(alpha: 0.2),
+                          side: BorderSide(
+                            color: isSelected ? BrandColors.primary : const Color(0xFFE5D5CF),
                           ),
-                        ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ]),
+            ),
+            if (widget.history.isEmpty)
+              SliverList(
+                delegate: SliverChildListDelegate([
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFDECE9),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        'Todavia no hay movimientos para mostrar.',
+                        style: GoogleFonts.workSans(fontSize: 14),
                       ),
                     ),
-                  ],
+                  ),
+                ]),
+              )
+            else
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    if (index == widget.history.length) {
+                      if (widget.hasMorePages) {
+                        return Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Center(
+                            child: CircularProgressIndicator(color: BrandColors.primary),
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    }
+
+                    final entry = widget.history[index];
+                    final accent = _accentForCategory(entry.category);
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFECDCD8)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 116,
+                              decoration: BoxDecoration(
+                                color: accent,
+                                borderRadius: const BorderRadius.horizontal(left: Radius.circular(20)),
+                              ),
+                            ),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: accent.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Icon(_iconForCategory(entry.category), color: accent),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            entry.title,
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w800,
+                                              color: BrandColors.onSurface,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            entry.description,
+                                            style: GoogleFonts.workSans(
+                                              fontSize: 13,
+                                              height: 1.35,
+                                              color: BrandColors.onSurface.withValues(alpha: 0.78),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Row(
+                                            children: [
+                                              Text(
+                                                _formatDate(entry.timestamp),
+                                                style: GoogleFonts.workSans(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: BrandColors.onSurface.withValues(alpha: 0.58),
+                                                ),
+                                              ),
+                                              const Spacer(),
+                                              if (entry.amount != null)
+                                                Text(
+                                                  r'$' + entry.amount!.toStringAsFixed(2),
+                                                  style: GoogleFonts.plusJakartaSans(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: const Color(0xFF0D8F43),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                  childCount: widget.history.length + (widget.hasMorePages ? 1 : 0),
                 ),
               ),
-              const SizedBox(height: 18),
-              Center(
-                child: TextButton(
-                  onPressed: () {},
-                  child: Text('LOAD MORE ARCHIVES', style: GoogleFonts.plusJakartaSans(color: BrandColors.primary, fontWeight: FontWeight.w800, letterSpacing: 1.8)),
-                ),
-              ),
-            ],
-          ),
+            SliverPadding(padding: const EdgeInsets.only(bottom: 128)),
+          ],
         ),
       ),
     );
@@ -188,12 +373,35 @@ class _HistoryTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const CircleAvatar(radius: 20, backgroundImage: NetworkImage('https://lh3.googleusercontent.com/aida-public/AB6AXuDZ-q2z5Ze2d6ySBBOUc3rwMuLv4ZNCNn4g0CocA-vC8yG-R_0Pi23-guhxA2kANBIx8pFZphmTQ-NIQyQqYhHmhw0X4_G99Sue6JfVgj6BOkamhN_GSN9Cz0Jcit0ZJ5OOdlkcjCRsMZo-idqmnwAQ3McVWa8-OgLHW8pSxz_z0iFj5YqQKPYukPfagEmMb5LVEe6ytmCG7PaRqtYp3CujqUbZsmepLVGxRgNuPIMI381h0Ltv9qlS0oFhMrYqRZ7RfYriFlUBoI4')),
+        const CircleAvatar(
+          radius: 20,
+          backgroundImage: NetworkImage(
+            'https://lh3.googleusercontent.com/aida-public/AB6AXuDZ-q2z5Ze2d6ySBBOUc3rwMuLv4ZNCNn4g0CocA-vC8yG-R_0Pi23-guhxA2kANBIx8pFZphmTQ-NIQyQqYhHmhw0X4_G99Sue6JfVgj6BOkamhN_GSN9Cz0Jcit0ZJ5OOdlkcjCRsMZo-idqmnwAQ3McVWa8-OgLHW8pSxz_z0iFj5YqQKPYukPfagEmMb5LVEe6ytmCG7PaRqtYp3CujqUbZsmepLVGxRgNuPIMI381h0Ltv9qlS0oFhMrYqRZ7RfYriFlUBoI4',
+          ),
+        ),
         const SizedBox(width: 10),
-        Text('History', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800, color: BrandColors.onSurface)),
+        Text(
+          'History',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: BrandColors.onSurface,
+          ),
+        ),
         const Spacer(),
-        IconButton(onPressed: onNotificationsTap, icon: const Icon(Icons.notifications_rounded, color: BrandColors.onSurface)),
-        Text('VehiSOS', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800, fontStyle: FontStyle.italic, color: BrandColors.primary)),
+        IconButton(
+          onPressed: onNotificationsTap,
+          icon: const Icon(Icons.notifications_rounded, color: BrandColors.onSurface),
+        ),
+        Text(
+          'VehiSOS',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            fontStyle: FontStyle.italic,
+            color: BrandColors.primary,
+          ),
+        ),
       ],
     );
   }

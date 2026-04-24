@@ -13,6 +13,7 @@ class WorkshopSuggestion {
     required this.reasons,
     required this.latitude,
     required this.longitude,
+    this.phoneNumber,
     this.isOpen = true,
   });
 
@@ -24,6 +25,7 @@ class WorkshopSuggestion {
   final List<String> reasons;
   final double latitude;
   final double longitude;
+  final String? phoneNumber;
   final bool isOpen;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -35,6 +37,7 @@ class WorkshopSuggestion {
         'reasons': reasons,
         'latitude': latitude,
         'longitude': longitude,
+        'phoneNumber': phoneNumber,
         'isOpen': isOpen,
       };
 
@@ -48,6 +51,7 @@ class WorkshopSuggestion {
       reasons: (json['reasons'] as List<dynamic>?)?.map((item) => item.toString()).toList() ?? const [],
       latitude: (json['latitude'] as num?)?.toDouble() ?? 0,
       longitude: (json['longitude'] as num?)?.toDouble() ?? 0,
+      phoneNumber: json['phoneNumber'] as String?,
       isOpen: json['isOpen'] as bool? ?? true,
     );
   }

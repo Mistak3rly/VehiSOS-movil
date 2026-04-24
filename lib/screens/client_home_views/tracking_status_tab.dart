@@ -6,10 +6,18 @@ class _TrackingStatusTab extends StatefulWidget {
   const _TrackingStatusTab({
     required this.initialToken,
     required this.onOpenNotifications,
+    required this.onWorkshopAssigned,
+    required this.onHistoryEvent,
   });
 
   final String initialToken;
   final VoidCallback onOpenNotifications;
+  final ValueChanged<WorkshopSuggestion> onWorkshopAssigned;
+  final void Function({
+    required String title,
+    required String description,
+    required String category,
+  }) onHistoryEvent;
 
   @override
   State<_TrackingStatusTab> createState() => _TrackingStatusTabState();
@@ -27,6 +35,7 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
     _WorkshopSeed(
       name: 'Silverstone Auto Center',
       address: 'Av. Reforma 102, Centro',
+      phoneNumber: '+525511100101',
       latitude: 19.4378,
       longitude: -99.1498,
       rating: 4.9,
@@ -36,6 +45,7 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
     _WorkshopSeed(
       name: 'Guardian Repair Hub',
       address: 'Calle Insurgentes 880',
+      phoneNumber: '+525511100202',
       latitude: 19.4285,
       longitude: -99.1388,
       rating: 4.8,
@@ -45,6 +55,7 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
     _WorkshopSeed(
       name: 'QuickTow Express',
       address: 'Calzada Sur 210',
+      phoneNumber: '+525511100303',
       latitude: 19.4212,
       longitude: -99.1214,
       rating: 4.7,
@@ -184,6 +195,7 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
         reasons: seed.reasons,
         latitude: seed.latitude,
         longitude: seed.longitude,
+        phoneNumber: seed.phoneNumber,
         isOpen: true,
       );
     }).toList(growable: false);
@@ -195,10 +207,17 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
       _messages.add(
         _ChatMessage.status(
           text:
-              'Workshop selected: ${workshop.name}. Location shared with the workshop through chat.',
+              'Workshop selected: ${workshop.name}. Incident details and location were shared with the workshop.',
         ),
       );
     });
+
+    widget.onWorkshopAssigned(workshop);
+    widget.onHistoryEvent(
+      title: 'Incidente enviado',
+      description: 'Solicitud enviada a ${workshop.name}.',
+      category: 'workshop',
+    );
 
     _moveCamera(LatLng(workshop.latitude, workshop.longitude), 14.2);
   }
@@ -213,6 +232,12 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
       _messages.add(_ChatMessage.text(text: text, fromUser: true));
       _composerController.clear();
     });
+
+    widget.onHistoryEvent(
+      title: 'Mensaje enviado',
+      description: 'Mensaje enviado al chat de asistencia.',
+      category: 'chat',
+    );
 
     _appendAssistantReply(text);
   }
@@ -241,6 +266,12 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
         );
         _messages.add(const _ChatMessage.status(text: 'Audio message sent to the workshop.'));
       });
+
+      widget.onHistoryEvent(
+        title: 'Audio enviado',
+        description: 'Audio compartido con el taller seleccionado.',
+        category: 'chat',
+      );
       return;
     }
 
@@ -305,6 +336,12 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
         ),
       );
     });
+
+    widget.onHistoryEvent(
+      title: 'Ubicacion compartida',
+      description: label,
+      category: 'workshop',
+    );
   }
 
   Future<void> _attachFiles({bool audioOnly = false}) async {
@@ -329,6 +366,51 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
         );
       }
     });
+
+    widget.onHistoryEvent(
+      title: audioOnly ? 'Audio adjunto' : 'Archivo adjunto',
+      description: 'Se enviaron ${result.files.length} archivo(s) al chat.',
+      category: 'chat',
+    );
+  }
+
+  Future<void> _callSelectedWorkshop() async {
+    final phone = _selectedWorkshop?.phoneNumber;
+    if (phone == null || phone.isEmpty) {
+      setState(() {
+        _messages.add(
+          const _ChatMessage.status(
+            text: 'El taller seleccionado no tiene numero disponible para llamada.',
+          ),
+        );
+      });
+      return;
+    }
+
+    final uri = Uri(scheme: 'tel', path: phone);
+    final launched = await launchUrl(uri);
+    if (!mounted) {
+      return;
+    }
+
+    if (launched) {
+      widget.onHistoryEvent(
+        title: 'Llamada al taller',
+        description: 'Llamada iniciada a ${_selectedWorkshop!.name} ($phone).',
+        category: 'workshop',
+      );
+      setState(() {
+        _messages.add(_ChatMessage.status(text: 'Calling ${_selectedWorkshop!.name} at $phone...'));
+      });
+    } else {
+      setState(() {
+        _messages.add(
+          const _ChatMessage.status(
+            text: 'No se pudo iniciar la llamada en este dispositivo.',
+          ),
+        );
+      });
+    }
   }
 
   Future<void> _useAssistantForSuggestions() async {
@@ -583,6 +665,59 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
                 onSelectWorkshop: _selectWorkshop,
               ),
             ),
+            if (_selectedWorkshop?.phoneNumber != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFDECE9),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFF0D5D0)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Numero del taller asignado',
+                              style: GoogleFonts.workSans(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.2,
+                                color: BrandColors.onSurface.withValues(alpha: 0.7),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${_selectedWorkshop!.name} • ${_selectedWorkshop!.phoneNumber}',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: BrandColors.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _ActionPill(
+                        icon: Icons.mic_rounded,
+                        label: 'Audio',
+                        onTap: _toggleAudioRecording,
+                      ),
+                      const SizedBox(width: 8),
+                      _ActionPill(
+                        icon: Icons.call_rounded,
+                        label: 'Llamar',
+                        onTap: _callSelectedWorkshop,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -777,6 +912,7 @@ class _WorkshopSeed {
   const _WorkshopSeed({
     required this.name,
     required this.address,
+    required this.phoneNumber,
     required this.latitude,
     required this.longitude,
     required this.rating,
@@ -786,6 +922,7 @@ class _WorkshopSeed {
 
   final String name;
   final String address;
+  final String phoneNumber;
   final double latitude;
   final double longitude;
   final double rating;
