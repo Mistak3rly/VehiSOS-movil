@@ -32,6 +32,8 @@ class PaymentsTab extends StatelessWidget {
     required ClientPaymentCard card,
     required double amount,
     required String concept,
+    required int incidentId,
+    required int workshopId,
   }) onPay;
 
   Future<void> _openAddCardDialog(BuildContext context) async {
@@ -238,6 +240,8 @@ class PaymentsTab extends StatelessWidget {
           ? 'Servicio de asistencia'
           : 'Servicio ${assignedWorkshop!.name}',
     );
+    final incidentIdController = TextEditingController();
+    final workshopIdController = TextEditingController();
     ClientPaymentCard selectedCard = cards.first;
 
     final confirmed = await showDialog<bool>(
@@ -280,6 +284,22 @@ class PaymentsTab extends StatelessWidget {
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       decoration: const InputDecoration(labelText: 'Monto'),
                     ),
+                    TextField(
+                      controller: incidentIdController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'ID incidente (backend)',
+                        helperText: 'Dato real del backend para registrar el pago',
+                      ),
+                    ),
+                    TextField(
+                      controller: workshopIdController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'ID taller (backend)',
+                        helperText: 'Dato real del backend para registrar el pago',
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -291,13 +311,17 @@ class PaymentsTab extends StatelessWidget {
                 ElevatedButton(
                   onPressed: () {
                     final amount = double.tryParse(amountController.text.trim());
-                    if (amount == null || amount <= 0) {
+                    final incidentId = int.tryParse(incidentIdController.text.trim());
+                    final workshopId = int.tryParse(workshopIdController.text.trim());
+                    if (amount == null || amount <= 0 || incidentId == null || workshopId == null) {
                       return;
                     }
                     onPay(
                       card: selectedCard,
                       amount: amount,
                       concept: conceptController.text.trim(),
+                      incidentId: incidentId,
+                      workshopId: workshopId,
                     );
                     Navigator.of(dialogContext).pop(true);
                   },

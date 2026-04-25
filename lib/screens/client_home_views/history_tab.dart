@@ -49,10 +49,12 @@ class _HistoryTabState extends State<HistoryTab> {
   IconData _iconForCategory(String category) {
     switch (category) {
       case 'payment':
+      case 'pagos':
         return Icons.payments_rounded;
       case 'garage':
         return Icons.directions_car_filled_rounded;
       case 'workshop':
+      case 'talleres':
         return Icons.support_agent_rounded;
       case 'chat':
         return Icons.chat_rounded;
@@ -64,10 +66,12 @@ class _HistoryTabState extends State<HistoryTab> {
   Color _accentForCategory(String category) {
     switch (category) {
       case 'payment':
+      case 'pagos':
         return const Color(0xFF0D8F43);
       case 'garage':
         return const Color(0xFF1457A7);
       case 'workshop':
+      case 'talleres':
         return BrandColors.primary;
       case 'chat':
         return const Color(0xFF7A4B1F);
@@ -87,12 +91,12 @@ class _HistoryTabState extends State<HistoryTab> {
 
   @override
   Widget build(BuildContext context) {
-    final categories = ['todos', 'payment', 'garage', 'workshop', 'chat'];
+    final categories = ['todos', 'pagos', 'garage', 'talleres', 'chat'];
     final categoryLabels = {
       'todos': 'Todos',
-      'payment': 'Pagos',
+      'pagos': 'Pagos',
       'garage': 'Garage',
-      'workshop': 'Talleres',
+      'talleres': 'Talleres',
       'chat': 'Chat',
     };
 

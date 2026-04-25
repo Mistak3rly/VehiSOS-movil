@@ -63,11 +63,16 @@ class PaymentTransactionModel {
 
   factory PaymentTransactionModel.fromJson(Map<String, dynamic> json) {
     return PaymentTransactionModel(
-      id: (json['id'] as num).toInt(),
-      cardId: (json['card_id'] as num).toInt(),
-      amount: (json['amount'] as num).toDouble(),
-      concept: json['concept'] as String? ?? '',
-      timestamp: DateTime.parse(json['timestamp'] as String? ?? DateTime.now().toIso8601String()),
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      cardId: (json['card_id'] as num?)?.toInt() ?? (json['id_taller'] as num?)?.toInt() ?? 0,
+      amount: (json['amount'] as num?)?.toDouble() ?? (json['monto_total'] as num?)?.toDouble() ?? double.tryParse((json['monto_total'] ?? '0').toString()) ?? 0,
+      concept: json['concept'] as String? ?? json['metodo_pago'] as String? ?? '',
+      timestamp: DateTime.parse(
+        json['timestamp'] as String? ??
+            json['fecha_pago'] as String? ??
+            json['fecha_creacion'] as String? ??
+            DateTime.now().toIso8601String(),
+      ),
       clientId: (json['client_id'] as num?)?.toInt() ?? 0,
     );
   }
@@ -234,23 +239,24 @@ class VehiSosPaymentApi {
   }
 
   Future<PaymentTransactionModel> processPayment({
-    required int clientId,
-    required int cardId,
+    required int incidentId,
+    required int workshopId,
     required double amount,
-    required String concept,
+    required String paymentMethod,
   }) async {
     final response = await _client.post(
-      _uri('/api/v1/transactions'),
+      _uri('/api/v1/logistica/pagos'),
       headers: _jsonHeaders(),
       body: jsonEncode({
-        'client_id': clientId,
-        'card_id': cardId,
-        'amount': amount,
-        'concept': concept,
+        'id_incidente': incidentId,
+        'id_taller': workshopId,
+        'monto_total': amount,
+        'metodo_pago': paymentMethod,
+        'estado_pago': 'pagado',
       }),
     );
 
-    if (response.statusCode != 201) {
+    if (response.statusCode != 201 && response.statusCode != 200) {
       throw VehiSosApiException(
         _extractErrorMessage(response),
         statusCode: response.statusCode,

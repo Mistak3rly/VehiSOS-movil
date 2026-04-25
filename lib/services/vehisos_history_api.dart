@@ -14,7 +14,7 @@ class HistoryEventModel {
     this.metadata,
   });
 
-  final int id;
+  final String id;
   final String title;
   final String description;
   final String category; // 'payment', 'garage', 'workshop', 'chat', 'general'
@@ -24,15 +24,20 @@ class HistoryEventModel {
   final Map<String, dynamic>? metadata;
 
   factory HistoryEventModel.fromJson(Map<String, dynamic> json) {
+    final rawAmount = json['amount'] ?? (json['datos'] is Map<String, dynamic> ? (json['datos'] as Map<String, dynamic>)['monto'] : null);
     return HistoryEventModel(
-      id: (json['id'] as num).toInt(),
-      title: json['title'] as String? ?? '',
-      description: json['description'] as String? ?? '',
-      category: json['category'] as String? ?? 'general',
-      timestamp: DateTime.parse(json['timestamp'] as String? ?? DateTime.now().toIso8601String()),
+      id: (json['id'] ?? '').toString(),
+      title: (json['title'] as String?) ?? (json['titulo'] as String?) ?? '',
+      description: (json['description'] as String?) ?? (json['descripcion'] as String?) ?? '',
+      category: (json['category'] as String?) ?? (json['categoria'] as String?) ?? 'general',
+      timestamp: DateTime.parse(
+        (json['timestamp'] as String?) ??
+            (json['fecha'] as String?) ??
+            DateTime.now().toIso8601String(),
+      ),
       clientId: (json['client_id'] as num?)?.toInt() ?? 0,
-      amount: (json['amount'] as num?)?.toDouble(),
-      metadata: json['metadata'] as Map<String, dynamic>?,
+      amount: rawAmount is num ? rawAmount.toDouble() : null,
+      metadata: (json['metadata'] as Map<String, dynamic>?) ?? (json['datos'] as Map<String, dynamic>?),
     );
   }
 
@@ -62,14 +67,18 @@ class HistoryPageModel {
   final int totalPages;
 
   factory HistoryPageModel.fromJson(Map<String, dynamic> json) {
-    final List<dynamic> eventsList = json['items'] ?? [];
+    final List<dynamic> eventsList = (json['items'] as List<dynamic>?) ??
+        (json['movimientos'] as List<dynamic>?) ??
+        const [];
+    final pageSize = (json['page_size'] as num?)?.toInt() ?? eventsList.length;
+    final total = (json['total'] as num?)?.toInt() ?? eventsList.length;
     return HistoryPageModel(
       events: eventsList
           .map((e) => HistoryEventModel.fromJson(e as Map<String, dynamic>))
           .toList(),
-      total: (json['total'] as num?)?.toInt() ?? 0,
+      total: total,
       page: (json['page'] as num?)?.toInt() ?? 1,
-      pageSize: (json['page_size'] as num?)?.toInt() ?? 20,
+      pageSize: pageSize,
       totalPages: (json['total_pages'] as num?)?.toInt() ?? 1,
     );
   }
@@ -110,16 +119,38 @@ class VehiSosHistoryApi {
     return response.body.isNotEmpty ? response.body : 'Error en servidor';
   }
 
+  String _normalizeFilterCategory(String? category) {
+    switch (category) {
+      case null:
+      case 'todos':
+        return 'todos';
+      case 'payment':
+        return 'pagos';
+      case 'workshop':
+        return 'talleres';
+      default:
+        return category;
+    }
+  }
+
   Future<HistoryPageModel> getHistory({
     required int clientId,
     int page = 1,
     int pageSize = 20,
     String? category,
   }) async {
-    String queryPath = '/api/v1/history?client_id=$clientId&page=$page&page_size=$pageSize';
-    if (category != null && category != 'todos') {
-      queryPath += '&category=$category';
+    if (page > 1) {
+      return const HistoryPageModel(
+        events: [],
+        total: 0,
+        page: 1,
+        pageSize: 20,
+        totalPages: 1,
+      );
     }
+
+    final filtro = _normalizeFilterCategory(category);
+    final queryPath = '/api/v1/logistica/historial/movimientos?filtro=$filtro&limit=$pageSize';
 
     final response = await _client.get(
       _uri(queryPath),
@@ -133,7 +164,15 @@ class VehiSosHistoryApi {
       );
     }
 
-    return HistoryPageModel.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final pageModel = HistoryPageModel.fromJson(decoded);
+    return HistoryPageModel(
+      events: pageModel.events,
+      total: pageModel.total,
+      page: 1,
+      pageSize: pageSize,
+      totalPages: 1,
+    );
   }
 
   Future<HistoryEventModel> createEvent({

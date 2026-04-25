@@ -230,8 +230,18 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       return source;
     }
 
+    final aliases = <String, Set<String>>{
+      'pagos': {'pagos', 'payment'},
+      'payment': {'pagos', 'payment'},
+      'talleres': {'talleres', 'workshop'},
+      'workshop': {'talleres', 'workshop'},
+      'garage': {'garage'},
+      'chat': {'chat'},
+    };
+    final accepted = aliases[category] ?? {category};
+
     return source
-        .where((entry) => entry.category == category)
+        .where((entry) => accepted.contains(entry.category))
         .toList(growable: false);
   }
 
@@ -497,12 +507,53 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       await _appendHistoryViaApi(
         title: 'Tarjeta registrada',
         description: '${card.brand} terminada en ${card.last4} guardada para pagos.',
-        category: 'payment',
+        category: 'pagos',
       );
+    } on VehiSosApiException catch (e) {
+      final localCard = ClientPaymentCard(
+        id: card.id,
+        holder: card.holder,
+        last4: card.last4,
+        expMonth: card.expMonth,
+        expYear: card.expYear,
+        brand: card.brand,
+      );
+      setState(() {
+        _cards = [localCard, ..._cards];
+      });
+      _appendHistoryLocal(
+        title: 'Tarjeta registrada (local)',
+        description: '${card.brand} terminada en ${card.last4} guardada localmente.',
+        category: 'pagos',
+      );
+      if (mounted) {
+        final message = e.statusCode == 404
+            ? 'API de tarjetas no disponible; tarjeta guardada localmente para pruebas.'
+            : 'Tarjeta guardada localmente por error de API: ${e.message}';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
     } catch (e) {
+      final localCard = ClientPaymentCard(
+        id: card.id,
+        holder: card.holder,
+        last4: card.last4,
+        expMonth: card.expMonth,
+        expYear: card.expYear,
+        brand: card.brand,
+      );
+      setState(() {
+        _cards = [localCard, ..._cards];
+      });
+      _appendHistoryLocal(
+        title: 'Tarjeta registrada (local)',
+        description: '${card.brand} terminada en ${card.last4} guardada localmente.',
+        category: 'pagos',
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al registrar tarjeta: $e')),
+          SnackBar(content: Text('Tarjeta guardada localmente: $e')),
         );
       }
     }
@@ -539,8 +590,32 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       await _appendHistoryViaApi(
         title: 'Tarjeta actualizada',
         description: '${updatedCard.brand} terminada en ${updatedCard.last4} actualizada.',
-        category: 'payment',
+        category: 'pagos',
       );
+    } on VehiSosApiException catch (e) {
+      final index = _cards.indexWhere((c) => c.id == cardId);
+      if (index != -1) {
+        final updated = [..._cards];
+        updated[index] = ClientPaymentCard(
+          id: cardId,
+          holder: updatedCard.holder,
+          last4: updatedCard.last4,
+          expMonth: updatedCard.expMonth,
+          expYear: updatedCard.expYear,
+          brand: updatedCard.brand,
+        );
+        setState(() {
+          _cards = updated;
+        });
+      }
+      if (mounted) {
+        final message = e.statusCode == 404
+            ? 'API de tarjetas no disponible; cambios guardados localmente.'
+            : 'Cambios guardados localmente por error de API: ${e.message}';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -564,8 +639,20 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       await _appendHistoryViaApi(
         title: 'Tarjeta eliminada',
         description: '${card.brand} terminada en ${card.last4} ha sido eliminada.',
-        category: 'payment',
+        category: 'pagos',
       );
+    } on VehiSosApiException catch (e) {
+      setState(() {
+        _cards = _cards.where((c) => c.id != cardId || (cardId == 0 && c.last4 != card.last4)).toList();
+      });
+      if (mounted) {
+        final message = e.statusCode == 404
+            ? 'API de tarjetas no disponible; eliminación aplicada localmente.'
+            : 'Eliminación aplicada localmente por error de API: ${e.message}';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -579,51 +666,34 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     required ClientPaymentCard card,
     required double amount,
     required String concept,
+    required int incidentId,
+    required int workshopId,
   }) async {
     try {
-      if (card.id <= 0) {
-        _appendHistoryLocal(
-          title: 'Pago realizado (local)',
-          description: '$concept pagado con ${card.brand} **** ${card.last4}.',
-          category: 'payment',
-          amount: amount,
-        );
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Pago registrado localmente. Registra nuevamente la tarjeta para sincronizar con API.'),
-            ),
-          );
-        }
-        return;
-      }
-
       await _paymentApi.processPayment(
-        clientId: widget.user.id,
-        cardId: card.id,
+        incidentId: incidentId,
+        workshopId: workshopId,
         amount: amount,
-        concept: concept,
+        paymentMethod: '${card.brand} **** ${card.last4}',
       );
 
       await _appendHistoryViaApi(
         title: 'Pago realizado',
         description: '$concept pagado con ${card.brand} **** ${card.last4}.',
-        category: 'payment',
+        category: 'pagos',
         amount: amount,
       );
     } on VehiSosApiException catch (e) {
-      if (e.statusCode == 404) {
-        _appendHistoryLocal(
-          title: 'Pago realizado (local)',
-          description: '$concept pagado con ${card.brand} **** ${card.last4}.',
-          category: 'payment',
-          amount: amount,
-        );
-      }
+      _appendHistoryLocal(
+        title: 'Pago pendiente de sincronizar',
+        description: '$concept con ${card.brand} **** ${card.last4}. Incidente $incidentId, Taller $workshopId.',
+        category: 'pagos',
+        amount: amount,
+      );
       if (mounted) {
         final message = e.statusCode == 404
-            ? 'Endpoint de pago no encontrado en backend. El pago se guardó localmente.'
-            : 'Error al procesar pago: ${e.message}';
+            ? 'Endpoint /api/v1/logistica/pagos no encontrado. Pago guardado localmente para reintento.'
+            : 'Pago no sincronizado (${e.statusCode ?? 'sin código'}): ${e.message}';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message)),
         );
