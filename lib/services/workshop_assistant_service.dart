@@ -62,11 +62,15 @@ class WorkshopAssistantResult {
     required this.assistantText,
     required this.recommendations,
     required this.usedFallback,
+    this.provider = 'local',
+    this.model,
   });
 
   final String assistantText;
   final List<WorkshopSuggestion> recommendations;
   final bool usedFallback;
+  final String provider;
+  final String? model;
 }
 
 class ClaudeWorkshopAssistantService {
@@ -154,10 +158,15 @@ class ClaudeWorkshopAssistantService {
                 .toList(growable: false)
             : _rankLocally(userLatitude, userLongitude, candidates);
         final assistantText = decoded['assistantText'] as String? ?? _buildLocalAssistantText(issue, recommendations);
+        final fallback = decoded['fallback'] as bool? ?? false;
+        final provider = decoded['provider'] as String? ?? 'local';
+        final model = decoded['model'] as String?;
         return WorkshopAssistantResult(
           assistantText: assistantText,
           recommendations: recommendations,
-          usedFallback: decoded['fallback'] as bool? ?? false,
+          usedFallback: fallback,
+          provider: provider,
+          model: model,
         );
       }
     } catch (_) {
@@ -173,6 +182,8 @@ class ClaudeWorkshopAssistantService {
       assistantText: _buildLocalAssistantText(issue, ranked),
       recommendations: ranked,
       usedFallback: true,
+      provider: 'local',
+      model: 'workshop-ranking-local-v1',
     );
   }
 

@@ -72,6 +72,11 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
   final List<_ChatMessage> _messages = [];
   bool _isRecordingAudio = false;
 
+  // Estado de la IA
+  String _aiProvider = 'local';
+  String? _aiModel;
+  bool _isAiFallback = true;
+
   @override
   void initState() {
     super.initState();
@@ -166,6 +171,10 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
       _selectedWorkshop ??=
           result.recommendations.isNotEmpty ? result.recommendations.first : null;
       _messages.add(_ChatMessage.assistant(text: result.assistantText));
+      // Actualizar estado de la IA
+      _aiProvider = result.provider;
+      _aiModel = result.model;
+      _isAiFallback = result.usedFallback;
     });
 
     if (_selectedWorkshop != null) {
@@ -480,7 +489,7 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
           padding: EdgeInsets.only(bottom: 280 + MediaQuery.of(context).padding.bottom),
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
               child: Row(
                 children: [
                   IconButton(
@@ -504,6 +513,12 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
                 ],
               ),
             ),
+            // AI Provider Status Badge
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _buildAIStatusBadge(),
+            ),
+            const SizedBox(height: 8),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Container(
@@ -903,6 +918,121 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
             const SizedBox(height: 48),
           ],
         ),
+      ),
+    );
+  }
+
+  // Widget para mostrar el estado de la IA (OpenAI, Claude o Local)
+  Widget _buildAIStatusBadge() {
+    final bool isRealAI = !_isAiFallback && _aiProvider != 'local';
+
+    Color bgColor;
+    Color borderColor;
+    Color textColor;
+    IconData icon;
+    String providerName;
+    String subtitle;
+
+    if (isRealAI) {
+      switch (_aiProvider.toLowerCase()) {
+        case 'openai':
+          bgColor = const Color(0xFFE3F2FD);
+          borderColor = const Color(0xFF90CAF9);
+          textColor = const Color(0xFF1565C0);
+          icon = Icons.psychology;
+          providerName = 'OpenAI';
+          subtitle = _aiModel ?? 'GPT';
+          break;
+        case 'anthropic':
+        case 'claude':
+          bgColor = const Color(0xFFF3E5F5);
+          borderColor = const Color(0xFFCE93D8);
+          textColor = const Color(0xFF7B1FA2);
+          icon = Icons.auto_fix_high;
+          providerName = 'Claude';
+          subtitle = _aiModel ?? 'Anthropic';
+          break;
+        default:
+          bgColor = const Color(0xFFE8F5E9);
+          borderColor = const Color(0xFFA5D6A7);
+          textColor = const Color(0xFF2E7D32);
+          icon = Icons.smart_toy;
+          providerName = 'IA Real';
+          subtitle = _aiModel ?? _aiProvider;
+      }
+    } else {
+      // Modo local/fallback
+      bgColor = const Color(0xFFFFF3E0);
+      borderColor = const Color(0xFFFFCC80);
+      textColor = const Color(0xFFEF6C00);
+      icon = Icons.computer;
+      providerName = 'Modo Local';
+      subtitle = 'Sin conexión a IA';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor, width: 1.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: borderColor,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              size: 16,
+              color: textColor,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                isRealAI ? '🤖 $providerName' : '💻 $providerName',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: textColor,
+                ),
+              ),
+              Text(
+                isRealAI ? 'Respuestas generadas por IA real' : subtitle,
+                style: GoogleFonts.workSans(
+                  fontSize: 11,
+                  color: textColor.withOpacity(0.8),
+                ),
+              ),
+            ],
+          ),
+          if (isRealAI) ...[
+            const SizedBox(width: 8),
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: Colors.green,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.green.withOpacity(0.4),
+                    blurRadius: 6,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
