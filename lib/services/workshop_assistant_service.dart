@@ -1,7 +1,21 @@
 import 'dart:convert';
+import 'dart:html' if (dart.library.io) 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+
+// Helper para logging que funciona en web y móvil
+void _log(String message) {
+  if (kIsWeb) {
+    // En web, usa console.log para que se vea en Chrome DevTools
+    final console = (document as dynamic).window.console;
+    console.log(message);
+  } else {
+    // En móvil nativo, usa print
+    // ignore: avoid_print
+    print(message);
+  }
+}
 
 class WorkshopSuggestion {
   const WorkshopSuggestion({
@@ -115,7 +129,12 @@ class ClaudeWorkshopAssistantService {
     required List<WorkshopSuggestion> candidates,
     String? token,
   }) async {
+    _log('🤖 IA Request to: $_baseUrl/recommend-workshops');
+    _log('📍 Location: $userLatitude, $userLongitude');
+    _log('🔧 Issue: $issue');
+    
     if (_baseUrl.isEmpty) {
+      _log('⚠️ Base URL empty, using local fallback');
       final local = _rankLocally(userLatitude, userLongitude, candidates);
       return _localResult(issue, local);
     }
@@ -136,6 +155,7 @@ class ClaudeWorkshopAssistantService {
       );
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
+        _log('❌ IA Error HTTP ${response.statusCode}: ${response.body}');
         final local = _rankLocally(userLatitude, userLongitude, candidates);
         return _localResult(issue, local);
       }
@@ -161,6 +181,7 @@ class ClaudeWorkshopAssistantService {
         final fallback = decoded['fallback'] as bool? ?? false;
         final provider = decoded['provider'] as String? ?? 'local';
         final model = decoded['model'] as String?;
+        _log('✅ IA Success: provider=$provider, fallback=$fallback, model=$model');
         return WorkshopAssistantResult(
           assistantText: assistantText,
           recommendations: recommendations,
@@ -169,8 +190,10 @@ class ClaudeWorkshopAssistantService {
           model: model,
         );
       }
-    } catch (_) {
+    } catch (e, stackTrace) {
       // Keep the tracking screen usable even when the AI service is offline.
+      _log('❌ IA Exception: $e');
+      _log('📍 StackTrace: $stackTrace');
     }
 
     final local = _rankLocally(userLatitude, userLongitude, candidates);
