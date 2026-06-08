@@ -76,7 +76,9 @@ class _SosReportTabState extends State<_SosReportTab> {
       _talleresError = null;
     });
     try {
-      final talleres = await widget.talleresApi.getTalleresActivos();
+      final talleres = await widget.talleresApi
+          .getTalleresActivos()
+          .timeout(const Duration(seconds: 8));
       // Ordenar por distancia si tenemos GPS
       talleres.sort((TallerDisponible a, TallerDisponible b) =>
           a.distanciaKm(_lat, _lng).compareTo(b.distanciaKm(_lat, _lng)));

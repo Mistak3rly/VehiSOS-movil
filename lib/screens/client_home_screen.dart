@@ -267,10 +267,23 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   String _scopedKey(String suffix) => 'vehisos.client.${widget.user.id}.$suffix';
 
   Future<void> _loadClientData() async {
+    const kTimeout = Duration(seconds: 8);
+
+    // Lanzamos las 3 peticiones en paralelo para que el tiempo total sea
+    // max(t1, t2, t3) en lugar de t1 + t2 + t3.
+    final vehiclesFut = _vehicleApi.getVehicles().timeout(kTimeout);
+    final cardsFut    = _paymentApi.getPaymentCards(widget.user.id).timeout(kTimeout);
+    final historyFut  = _historyApi.getHistory(
+      clientId: widget.user.id,
+      page: 1,
+      category: _historyFilterCategory != 'todos' ? _historyFilterCategory : null,
+    ).timeout(kTimeout);
+
+    // ── Vehículos ────────────────────────────────────────────────────────────
+    List<ClientVehicle> vehicles = const [];
     try {
-      // Load vehicles from API (real endpoints)
-      final apiVehicles = await _vehicleApi.getVehicles();
-      final vehicles = apiVehicles
+      final apiVehicles = await vehiclesFut;
+      vehicles = apiVehicles
           .map((v) => ClientVehicle(
                 id: v.id,
                 nickname: v.observaciones ?? v.displayName,
@@ -280,12 +293,27 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                 isPrimary: false,
               ))
           .toList();
+    } catch (_) {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_scopedKey('garage'));
+      if (raw != null && raw.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(raw) as List<dynamic>;
+          vehicles = decoded
+              .whereType<Map<String, dynamic>>()
+              .map(ClientVehicle.fromJson)
+              .toList(growable: false);
+        } catch (_) {}
+      }
+    }
 
-      // Load cards from API
-      final apiCards = await _paymentApi.getPaymentCards(widget.user.id);
-      final cards = apiCards
+    // ── Tarjetas de pago ─────────────────────────────────────────────────────
+    List<ClientPaymentCard> cards = const [];
+    try {
+      final apiCards = await cardsFut;
+      cards = apiCards
           .map((c) => ClientPaymentCard(
-            id: c.id,
+                id: c.id,
                 holder: c.holderName,
                 last4: c.last4,
                 expMonth: c.expMonth,
@@ -293,14 +321,26 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                 brand: c.brand,
               ))
           .toList();
+    } catch (_) {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_scopedKey('cards'));
+      if (raw != null && raw.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(raw) as List<dynamic>;
+          cards = decoded
+              .whereType<Map<String, dynamic>>()
+              .map(ClientPaymentCard.fromJson)
+              .toList(growable: false);
+        } catch (_) {}
+      }
+    }
 
-      // Load history from API (first page)
-      final historyPage = await _historyApi.getHistory(
-        clientId: widget.user.id,
-        page: 1,
-        category: _historyFilterCategory != 'todos' ? _historyFilterCategory : null,
-      );
-      final history = historyPage.events
+    // ── Historial ────────────────────────────────────────────────────────────
+    List<ClientHistoryEntry> history = const [];
+    int totalPages = 1;
+    try {
+      final historyPage = await historyFut;
+      history = historyPage.events
           .map((e) => ClientHistoryEntry(
                 title: e.title,
                 description: e.description,
@@ -309,103 +349,32 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                 amount: e.amount,
               ))
           .toList();
-
-      if (!mounted) return;
-
-      setState(() {
-        _vehicles = vehicles.isEmpty
-            ? const [
-                ClientVehicle(
-                  nickname: 'Auto principal',
-                  plate: 'ABC-1234',
-                  model: 'Toyota Corolla',
-                  color: 'Plata',
-                  isPrimary: true,
-                )
-              ]
-            : vehicles;
-        _cards = cards.isEmpty
-            ? const [
-                ClientPaymentCard(
-                  holder: 'USUARIO VEHISOS',
-                  last4: '4492',
-                  expMonth: 9,
-                  expYear: 27,
-                  brand: 'VISA',
-                )
-              ]
-            : cards;
-        _historySource = history;
-        _history = _filterHistoryEntries(history, _historyFilterCategory);
-        _historyTotalPages = historyPage.totalPages;
-        _loadingClientData = false;
-      });
-    } catch (e) {
-      // Fallback to SharedPreferences if API fails
-      await _loadClientDataFallback();
-    }
-  }
-
-  Future<void> _loadClientDataFallback() async {
-    final prefs = await SharedPreferences.getInstance();
-    final rawVehicles = prefs.getString(_scopedKey('garage'));
-    final rawCards = prefs.getString(_scopedKey('cards'));
-    final rawHistory = prefs.getString(_scopedKey('history'));
-
-    List<ClientVehicle> vehicles = const [
-      ClientVehicle(
-        nickname: 'Auto principal',
-        plate: 'ABC-1234',
-        model: 'Toyota Corolla',
-        color: 'Plata',
-        isPrimary: true,
-      ),
-    ];
-    List<ClientPaymentCard> cards = const [
-      ClientPaymentCard(
-        holder: 'USUARIO VEHISOS',
-        last4: '4492',
-        expMonth: 9,
-        expYear: 27,
-        brand: 'VISA',
-      ),
-    ];
-    List<ClientHistoryEntry> history = const [];
-
-    if (rawVehicles != null && rawVehicles.isNotEmpty) {
-      final decoded = jsonDecode(rawVehicles) as List<dynamic>;
-      vehicles = decoded
-          .whereType<Map<String, dynamic>>()
-          .map(ClientVehicle.fromJson)
-          .toList(growable: false);
-    }
-
-    if (rawCards != null && rawCards.isNotEmpty) {
-      final decoded = jsonDecode(rawCards) as List<dynamic>;
-      cards = decoded
-          .whereType<Map<String, dynamic>>()
-          .map(ClientPaymentCard.fromJson)
-          .toList(growable: false);
-    }
-
-    if (rawHistory != null && rawHistory.isNotEmpty) {
-      final decoded = jsonDecode(rawHistory) as List<dynamic>;
-      history = decoded
-          .whereType<Map<String, dynamic>>()
-          .map(ClientHistoryEntry.fromJson)
-          .toList(growable: false);
-    }
+      totalPages = historyPage.totalPages;
+    } catch (_) {}
 
     if (!mounted) return;
 
     setState(() {
+      // Sin vehículos reales → lista vacía (no un vehículo ficticio)
       _vehicles = vehicles;
-      _cards = cards;
+      _cards = cards.isEmpty
+          ? const [
+              ClientPaymentCard(
+                holder: 'USUARIO VEHISOS',
+                last4: '4492',
+                expMonth: 9,
+                expYear: 27,
+                brand: 'VISA',
+              )
+            ]
+          : cards;
       _historySource = history;
       _history = _filterHistoryEntries(history, _historyFilterCategory);
+      _historyTotalPages = totalPages;
       _loadingClientData = false;
     });
   }
+
 
   Future<void> _addVehicleViaApi(ClientVehicle vehicle) async {
     try {
@@ -1043,6 +1012,17 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                   apiBaseUrl: _apiBaseUrl,
                   token: widget.initialToken,
                   onOpenNotifications: _openNotifications,
+                  onPagoConfirmado: (cot) {
+                    _appendHistoryViaApi(
+                      title: 'Pago confirmado',
+                      description:
+                          'Pagaste Bs. ${cot.totalConComision.toStringAsFixed(2)} '
+                          'por cotización #${cot.id} · Incidente #${cot.idIncidente}. '
+                          'Método: ${cot.metodoPago ?? 'no especificado'}.',
+                      category: 'pagos',
+                      amount: cot.totalConComision,
+                    );
+                  },
                 ),
               ],
             ),

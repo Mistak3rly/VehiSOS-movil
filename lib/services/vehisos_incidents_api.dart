@@ -66,8 +66,8 @@ class IncidenteModel {
       id: (json['id'] as num).toInt(),
       codigoIncidente: json['codigo_incidente'] as String? ?? '',
       titulo: json['titulo'] as String? ?? '',
-      latitud: (json['latitud'] as num?)?.toDouble() ?? 0.0,
-      longitud: (json['longitud'] as num?)?.toDouble() ?? 0.0,
+      latitud: _parseDecimal(json['latitud']),
+      longitud: _parseDecimal(json['longitud']),
       estadoNombre: estado?['nombre'] as String? ?? 'Pendiente',
       fechaReporte: DateTime.tryParse(json['fecha_reporte'] as String? ?? '') ??
           DateTime.now(),
@@ -80,6 +80,14 @@ class IncidenteModel {
           : null,
       requiereGrua: json['requiere_grua'] as bool? ?? false,
     );
+  }
+
+  /// Pydantic serializa Decimal como String. Acepta ambos formatos.
+  static double _parseDecimal(dynamic v) {
+    if (v == null) return 0.0;
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v) ?? 0.0;
+    return 0.0;
   }
 }
 

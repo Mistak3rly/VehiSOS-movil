@@ -52,10 +52,17 @@ class TallerDisponible {
         telefono: json['telefono'] as String?,
         direccion: json['direccion'] as String?,
         ciudad: json['ciudad'] as String?,
-        latitud: (json['latitud'] as num?)?.toDouble(),
-        longitud: (json['longitud'] as num?)?.toDouble(),
+        latitud: _parseDecimal(json['latitud']),
+        longitud: _parseDecimal(json['longitud']),
         capacidadMaxima: (json['capacidad_maxima'] as num?)?.toInt() ?? 1,
       );
+
+  static double? _parseDecimal(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v);
+    return null;
+  }
 }
 
 class VehiSosTalleresApi {

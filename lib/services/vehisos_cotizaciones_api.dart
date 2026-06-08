@@ -50,6 +50,13 @@ class CotizacionModel {
   bool get isVencida => estado == 'vencida';
   bool get isPendiente => estado == 'pendiente';
 
+  static double _d(dynamic v, [double fallback = 0.0]) {
+    if (v == null) return fallback;
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v) ?? fallback;
+    return fallback;
+  }
+
   factory CotizacionModel.fromJson(Map<String, dynamic> json) =>
       CotizacionModel(
         id: (json['id'] as num).toInt(),
@@ -57,11 +64,10 @@ class CotizacionModel {
         idTaller: (json['id_taller'] as num).toInt(),
         descripcionDesperfecto:
             json['descripcion_desperfecto'] as String? ?? '',
-        costoRepuestos: (json['costo_repuestos'] as num?)?.toDouble() ?? 0.0,
-        costoManoObra: (json['costo_mano_obra'] as num?)?.toDouble() ?? 0.0,
-        costoTotal: (json['costo_total'] as num?)?.toDouble() ?? 0.0,
-        comisionPlataforma:
-            (json['comision_plataforma'] as num?)?.toDouble() ?? 0.0,
+        costoRepuestos: _d(json['costo_repuestos']),
+        costoManoObra: _d(json['costo_mano_obra']),
+        costoTotal: _d(json['costo_total']),
+        comisionPlataforma: _d(json['comision_plataforma']),
         estado: json['estado'] as String? ?? 'pendiente',
         repuestos: json['repuestos'] as String?,
         tiempoEstimado: (json['tiempo_estimado'] as num?)?.toInt(),

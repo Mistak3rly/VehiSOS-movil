@@ -26,7 +26,6 @@ class _TrackingStatusTab extends StatefulWidget {
 }
 
 class _TrackingStatusTabState extends State<_TrackingStatusTab> {
-  final ClaudeWorkshopAssistantService _assistantService = ClaudeWorkshopAssistantService();
   final TextEditingController _composerController = TextEditingController();
   final FlutterSoundRecord _audioRecorder = FlutterSoundRecord();
 
@@ -37,7 +36,6 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
 
   // Talleres cargados desde el backend
   List<TallerDisponible> _talleresBackend = const [];
-  bool _loadingTalleres = false;
 
   late LatLng _currentLocation = _fallbackLocation;
   bool _loadingLocation = true;
@@ -82,21 +80,17 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
   }
 
   Future<void> _loadRealWorkshops() async {
-    setState(() => _loadingTalleres = true);
     try {
-      final talleres = await widget.talleresApi.getTalleresActivos();
+      final talleres = await widget.talleresApi
+          .getTalleresActivos()
+          .timeout(const Duration(seconds: 8));
       if (!mounted) return;
-      // Ordenar por distancia al usuario
       talleres.sort((TallerDisponible a, TallerDisponible b) =>
           a.distanciaKm(_currentLocation.latitude, _currentLocation.longitude)
               .compareTo(b.distanciaKm(_currentLocation.latitude, _currentLocation.longitude)));
-      setState(() {
-        _talleresBackend = talleres;
-        _loadingTalleres = false;
-      });
+      setState(() => _talleresBackend = talleres);
     } catch (_) {
-      if (!mounted) return;
-      setState(() => _loadingTalleres = false);
+      // Falla silenciosa: las recomendaciones quedarán vacías
     }
   }
 
@@ -147,32 +141,39 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
   }
 
   Future<void> _refreshRecommendations() async {
-    final candidates = _buildCandidatesFor(_currentLocation);
-    final issue = _selectedWorkshop == null ? 'Flat tire assistance' : 'Route follow-up';
-    final result = await _assistantService.recommendWorkshops(
-      issue: issue,
-      userLatitude: _currentLocation.latitude,
-      userLongitude: _currentLocation.longitude,
-      candidates: candidates,
-      token: widget.initialToken,
-    );
+    // Usar directamente los talleres reales del backend (ya cargados y ordenados por distancia).
+    // No se pasa por el asistente de IA para no mezclar datos externos.
+    if (!mounted) return;
 
-    if (!mounted) {
-      return;
-    }
+    final workshops = _buildCandidatesFor(_currentLocation);
 
     setState(() {
-      _recommendedWorkshops = result.recommendations;
-      _selectedWorkshop ??=
-          result.recommendations.isNotEmpty ? result.recommendations.first : null;
-      _messages.add(_ChatMessage.assistant(text: result.assistantText));
-      // Actualizar estado de la IA
-      _aiProvider = result.provider;
-      _aiModel = result.model;
-      _isAiFallback = result.usedFallback;
+      _recommendedWorkshops = workshops;
+      _selectedWorkshop ??= workshops.isNotEmpty ? workshops.first : null;
+      _aiProvider = 'backend';
+      _aiModel = null;
+      _isAiFallback = false;
+
+      if (workshops.isEmpty) {
+        _messages.add(const _ChatMessage.assistant(
+          text: 'No encontré talleres disponibles en este momento. Intenta actualizar o contacta a soporte.',
+        ));
+      } else {
+        final top = workshops.first;
+        final distLabel = top.distanceKm > 0
+            ? '${top.distanceKm.toStringAsFixed(1)} km'
+            : 'distancia no disponible';
+        _messages.add(_ChatMessage.assistant(
+          text: 'Encontré ${workshops.length} taller(es) disponible(s). '
+              'El más cercano es ${top.name} ($distLabel). '
+              'Toca uno para seleccionarlo y compartir tu ubicación.',
+        ));
+      }
     });
 
-    if (_selectedWorkshop != null) {
+    if (_selectedWorkshop != null &&
+        _selectedWorkshop!.latitude != 0 &&
+        _selectedWorkshop!.longitude != 0) {
       _moveCamera(
         LatLng(_selectedWorkshop!.latitude, _selectedWorkshop!.longitude),
         14.2,

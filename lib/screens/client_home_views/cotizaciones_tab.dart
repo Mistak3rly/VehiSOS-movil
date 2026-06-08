@@ -6,11 +6,14 @@ class CotizacionesTab extends StatefulWidget {
     required this.apiBaseUrl,
     required this.token,
     required this.onOpenNotifications,
+    this.onPagoConfirmado,
   });
 
   final String apiBaseUrl;
   final String token;
   final VoidCallback onOpenNotifications;
+  /// Llamado tras confirmar un pago exitoso para registrar en el historial.
+  final void Function(CotizacionModel cotizacion)? onPagoConfirmado;
 
   @override
   State<CotizacionesTab> createState() => _CotizacionesTabState();
@@ -40,7 +43,8 @@ class _CotizacionesTabState extends State<CotizacionesTab> {
       _error = null;
     });
     try {
-      final data = await _api.getMisCotizaciones();
+      final data = await _api.getMisCotizaciones()
+          .timeout(const Duration(seconds: 10));
       if (!mounted) return;
       setState(() {
         _cotizaciones = data;
@@ -49,7 +53,7 @@ class _CotizacionesTabState extends State<CotizacionesTab> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'No se pudieron cargar las cotizaciones: $e';
+        _error = 'No se pudieron cargar las cotizaciones. Verifica tu conexión.';
         _loading = false;
       });
     }
@@ -76,7 +80,7 @@ class _CotizacionesTabState extends State<CotizacionesTab> {
                 Text('Método de pago:', style: GoogleFonts.workSans(fontSize: 14)),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  value: selected,
+                  initialValue: selected,
                   items: _metodosPago
                       .map((m) => DropdownMenuItem(value: m, child: Text(m)))
                       .toList(),
@@ -209,7 +213,7 @@ class _CotizacionesTabState extends State<CotizacionesTab> {
                         fontSize: 16, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: selected,
+                  initialValue: selected,
                   items: _metodosPago
                       .map((m) => DropdownMenuItem(value: m, child: Text(m)))
                       .toList(),
@@ -244,6 +248,7 @@ class _CotizacionesTabState extends State<CotizacionesTab> {
         metodoPago: confirm.toLowerCase(),
       );
       _replaceCotizacion(updated);
+      widget.onPagoConfirmado?.call(updated);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
