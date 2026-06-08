@@ -205,7 +205,7 @@ class GarageTab extends StatelessWidget {
       return;
     }
 
-    onEditVehicle?.call(vehicleId: index, updatedVehicle: result);
+    onEditVehicle?.call(vehicleId: vehicle.id, updatedVehicle: result);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('${result.model} actualizado correctamente.'),
@@ -455,7 +455,7 @@ class GarageTab extends StatelessWidget {
                                         ElevatedButton(
                                           onPressed: () {
                                             Navigator.of(dialogContext).pop();
-                                            onDeleteVehicle?.call(vehicleId: index, vehicle: vehicle);
+                                            onDeleteVehicle?.call(vehicleId: vehicle.id, vehicle: vehicle);
                                           },
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: Colors.red.shade500,

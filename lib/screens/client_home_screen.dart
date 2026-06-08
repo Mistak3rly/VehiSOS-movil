@@ -16,6 +16,8 @@ import '../services/vehisos_auth_api.dart';
 import '../services/vehisos_vehicle_api.dart';
 import '../services/vehisos_payment_api.dart';
 import '../services/vehisos_history_api.dart';
+import '../services/vehisos_incidents_api.dart';
+import '../services/vehisos_cotizaciones_api.dart';
 import '../services/workshop_assistant_service.dart';
 import '../theme/brand_colors.dart';
 import '../widgets/common_widgets.dart';
@@ -31,6 +33,7 @@ part 'client_home_views/profile_tab.dart';
 part 'client_home_views/garage_tab.dart';
 part 'client_home_views/history_tab.dart';
 part 'client_home_views/payments_tab.dart';
+part 'client_home_views/cotizaciones_tab.dart';
 part 'client_home_views/notifications_screen.dart';
 
 class ClientHomeScreen extends StatefulWidget {
@@ -53,6 +56,7 @@ class ClientHomeScreen extends StatefulWidget {
 
 class ClientVehicle {
   const ClientVehicle({
+    this.id = 0,
     required this.nickname,
     required this.plate,
     required this.model,
@@ -60,6 +64,7 @@ class ClientVehicle {
     this.isPrimary = false,
   });
 
+  final int id;
   final String nickname;
   final String plate;
   final String model;
@@ -67,6 +72,7 @@ class ClientVehicle {
   final bool isPrimary;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
         'nickname': nickname,
         'plate': plate,
         'model': model,
@@ -76,6 +82,7 @@ class ClientVehicle {
 
   factory ClientVehicle.fromJson(Map<String, dynamic> json) {
     return ClientVehicle(
+      id: (json['id'] as num?)?.toInt() ?? 0,
       nickname: json['nickname'] as String? ?? '',
       plate: json['plate'] as String? ?? '',
       model: json['model'] as String? ?? '',
@@ -167,6 +174,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   late VehiSosVehicleApi _vehicleApi;
   late VehiSosPaymentApi _paymentApi;
   late VehiSosHistoryApi _historyApi;
+  late VehiSosIncidentsApi _incidentsApi;
 
   WorkshopSuggestion? _assignedWorkshop;
   List<ClientVehicle> _vehicles = const [];
@@ -176,6 +184,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   int _historyPage = 1;
   int _historyTotalPages = 1;
   String _historyFilterCategory = 'todos';
+  String _apiBaseUrl = '';
 
   @override
   void initState() {
@@ -185,17 +194,21 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   }
 
   void _initializeApis() {
-    final apiBaseUrl = _resolveApiBaseUrl();
+    _apiBaseUrl = _resolveApiBaseUrl();
     _vehicleApi = VehiSosVehicleApi(
-      baseUrl: apiBaseUrl,
+      baseUrl: _apiBaseUrl,
       token: widget.initialToken,
     );
     _paymentApi = VehiSosPaymentApi(
-      baseUrl: apiBaseUrl,
+      baseUrl: _apiBaseUrl,
       token: widget.initialToken,
     );
     _historyApi = VehiSosHistoryApi(
-      baseUrl: apiBaseUrl,
+      baseUrl: _apiBaseUrl,
+      token: widget.initialToken,
+    );
+    _incidentsApi = VehiSosIncidentsApi(
+      baseUrl: _apiBaseUrl,
       token: widget.initialToken,
     );
   }
@@ -249,15 +262,16 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
 
   Future<void> _loadClientData() async {
     try {
-      // Load vehicles from API
-      final apiVehicles = await _vehicleApi.getVehicles(widget.user.id);
+      // Load vehicles from API (real endpoints)
+      final apiVehicles = await _vehicleApi.getVehicles();
       final vehicles = apiVehicles
           .map((v) => ClientVehicle(
-                nickname: v.nickname,
-                plate: v.plate,
-                model: v.model,
-                color: v.color,
-                isPrimary: v.isPrimary,
+                id: v.id,
+                nickname: v.observaciones ?? v.displayName,
+                plate: v.placa,
+                model: v.displayName,
+                color: v.color ?? '',
+                isPrimary: false,
               ))
           .toList();
 
@@ -389,22 +403,36 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
 
   Future<void> _addVehicleViaApi(ClientVehicle vehicle) async {
     try {
-      await _vehicleApi.createVehicle(
-        clientId: widget.user.id,
-        nickname: vehicle.nickname,
-        plate: vehicle.plate,
-        model: vehicle.model,
-        color: vehicle.color,
-        isPrimary: vehicle.isPrimary,
+      // Split "Marca Modelo" → marca=first word, modelo=rest
+      final parts = vehicle.model.trim().split(' ');
+      final marca = parts.isNotEmpty ? parts[0] : vehicle.model;
+      final modelo = parts.length > 1 ? parts.sublist(1).join(' ') : vehicle.model;
+
+      final created = await _vehicleApi.createVehicle(
+        marca: marca,
+        modelo: modelo,
+        placa: vehicle.plate,
+        color: vehicle.color.isEmpty ? null : vehicle.color,
+        observaciones: vehicle.nickname.isEmpty ? null : vehicle.nickname,
       );
 
       setState(() {
-        _vehicles = [vehicle, ..._vehicles];
+        _vehicles = [
+          ClientVehicle(
+            id: created.id,
+            nickname: created.observaciones ?? created.displayName,
+            plate: created.placa,
+            model: created.displayName,
+            color: created.color ?? '',
+            isPrimary: _vehicles.isEmpty,
+          ),
+          ..._vehicles,
+        ];
       });
 
       await _appendHistoryViaApi(
-        title: 'Vehiculo agregado',
-        description: '${vehicle.model} (${vehicle.plate}) agregado a My Garage.',
+        title: 'Vehículo agregado',
+        description: '${created.displayName} (${created.placa}) agregado a My Garage.',
         category: 'garage',
       );
     } catch (e) {
@@ -421,27 +449,35 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     required ClientVehicle updatedVehicle,
   }) async {
     try {
-      await _vehicleApi.updateVehicle(
+      final parts = updatedVehicle.model.trim().split(' ');
+      final marca = parts.isNotEmpty ? parts[0] : updatedVehicle.model;
+      final modelo = parts.length > 1 ? parts.sublist(1).join(' ') : updatedVehicle.model;
+
+      final updated = await _vehicleApi.updateVehicle(
         vehicleId: vehicleId,
-        nickname: updatedVehicle.nickname,
-        plate: updatedVehicle.plate,
-        model: updatedVehicle.model,
-        color: updatedVehicle.color,
-        isPrimary: updatedVehicle.isPrimary,
+        marca: marca,
+        modelo: modelo,
+        placa: updatedVehicle.plate,
+        color: updatedVehicle.color.isEmpty ? null : updatedVehicle.color,
+        observaciones: updatedVehicle.nickname.isEmpty ? null : updatedVehicle.nickname,
       );
 
-      final index = _vehicles.indexWhere((v) => v.model == updatedVehicle.model && v.plate == updatedVehicle.plate);
-      if (index != -1) {
-        final updated = [..._vehicles];
-        updated[index] = updatedVehicle;
-        setState(() {
-          _vehicles = updated;
-        });
-      }
+      setState(() {
+        _vehicles = _vehicles.map((v) => v.id == vehicleId
+            ? ClientVehicle(
+                id: updated.id,
+                nickname: updated.observaciones ?? updated.displayName,
+                plate: updated.placa,
+                model: updated.displayName,
+                color: updated.color ?? '',
+                isPrimary: v.isPrimary,
+              )
+            : v).toList();
+      });
 
       await _appendHistoryViaApi(
         title: 'Vehículo actualizado',
-        description: '${updatedVehicle.model} (${updatedVehicle.plate}) ha sido actualizado.',
+        description: '${updated.displayName} (${updated.placa}) actualizado.',
         category: 'garage',
       );
     } catch (e) {
@@ -461,12 +497,12 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       await _vehicleApi.deleteVehicle(vehicleId);
 
       setState(() {
-        _vehicles = _vehicles.where((v) => v.plate != vehicle.plate).toList();
+        _vehicles = _vehicles.where((v) => v.id != vehicleId).toList();
       });
 
       await _appendHistoryViaApi(
         title: 'Vehículo eliminado',
-        description: '${vehicle.model} (${vehicle.plate}) ha sido eliminado de My Garage.',
+        description: '${vehicle.model} (${vehicle.plate}) eliminado de My Garage.',
         category: 'garage',
       );
     } catch (e) {
@@ -940,6 +976,19 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                     ? _SosReportTab(
                         onBack: () => setState(() => _showSosReport = false),
                         onOpenNotifications: _openNotifications,
+                        vehicles: _vehicles,
+                        incidentsApi: _incidentsApi,
+                        onIncidenteCreado: (id) {
+                          setState(() {
+                            _showSosReport = false;
+                            _currentIndex = 1;
+                          });
+                          _appendHistoryViaApi(
+                            title: 'Incidente reportado',
+                            description: 'Incidente #$id creado y enviado al sistema.',
+                            category: 'talleres',
+                          );
+                        },
                       )
                     : _SosDashboardTab(
                         onOpenReport: () => setState(() => _showSosReport = true),
@@ -981,6 +1030,11 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                   onEditCard: _editCardViaApi,
                   onDeleteCard: _deleteCardViaApi,
                   onPay: _processPaymentViaApi,
+                ),
+                CotizacionesTab(
+                  apiBaseUrl: _apiBaseUrl,
+                  token: widget.initialToken,
+                  onOpenNotifications: _openNotifications,
                 ),
               ],
             ),
