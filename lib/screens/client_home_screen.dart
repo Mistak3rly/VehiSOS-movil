@@ -18,6 +18,7 @@ import '../services/vehisos_payment_api.dart';
 import '../services/vehisos_history_api.dart';
 import '../services/vehisos_incidents_api.dart';
 import '../services/vehisos_cotizaciones_api.dart';
+import '../services/vehisos_talleres_api.dart';
 import '../services/workshop_assistant_service.dart';
 import '../theme/brand_colors.dart';
 import '../widgets/common_widgets.dart';
@@ -175,6 +176,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   late VehiSosPaymentApi _paymentApi;
   late VehiSosHistoryApi _historyApi;
   late VehiSosIncidentsApi _incidentsApi;
+  late VehiSosTalleresApi _talleresApi;
 
   WorkshopSuggestion? _assignedWorkshop;
   List<ClientVehicle> _vehicles = const [];
@@ -208,6 +210,10 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       token: widget.initialToken,
     );
     _incidentsApi = VehiSosIncidentsApi(
+      baseUrl: _apiBaseUrl,
+      token: widget.initialToken,
+    );
+    _talleresApi = VehiSosTalleresApi(
       baseUrl: _apiBaseUrl,
       token: widget.initialToken,
     );
@@ -978,6 +984,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                         onOpenNotifications: _openNotifications,
                         vehicles: _vehicles,
                         incidentsApi: _incidentsApi,
+                        talleresApi: _talleresApi,
                         onIncidenteCreado: (id) {
                           setState(() {
                             _showSosReport = false;

@@ -129,6 +129,7 @@ class VehiSosIncidentsApi {
     required String titulo,
     required double latitud,
     required double longitud,
+    int? idTallerDestino,
     String? descripcionTexto,
     String? direccionTextual,
     bool requiereGrua = false,
@@ -140,6 +141,7 @@ class VehiSosIncidentsApi {
       'longitud': longitud,
       'requiere_grua': requiereGrua,
     };
+    if (idTallerDestino != null) body['id_taller_destino'] = idTallerDestino;
     if (descripcionTexto != null && descripcionTexto.isNotEmpty) {
       body['descripcion_texto'] = descripcionTexto;
     }
