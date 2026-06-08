@@ -1004,6 +1004,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                       ),
                 _TrackingStatusTab(
                   initialToken: widget.initialToken,
+                  talleresApi: _talleresApi,
                   onOpenNotifications: _openNotifications,
                   onWorkshopAssigned: _onWorkshopAssigned,
                   onHistoryEvent: _onTrackingEvent,

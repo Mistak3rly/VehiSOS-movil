@@ -215,12 +215,12 @@ class _SosReportTabState extends State<_SosReportTab> {
         _buildProgressBar(),
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 160),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildStepContent(),
-                const SizedBox(height: 28),
+                const SizedBox(height: 16),
                 _buildNavigationButtons(),
               ],
             ),
@@ -448,11 +448,11 @@ class _SosReportTabState extends State<_SosReportTab> {
       tituloResaltado: 'emergencia?',
       child: GridView.count(
         crossAxisCount: 2,
-        childAspectRatio: 0.92,
+        childAspectRatio: 1.3,
         physics: const NeverScrollableScrollPhysics(),
         shrinkWrap: true,
-        mainAxisSpacing: 14,
-        crossAxisSpacing: 14,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
         children: List.generate(_tiposEmergencia.length, (i) {
           final t = _tiposEmergencia[i];
           final active = _selectedType == i;
@@ -460,10 +460,10 @@ class _SosReportTabState extends State<_SosReportTab> {
             onTap: () => setState(() => _selectedType = i),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: active ? Colors.white : const Color(0xFFFDEDEB),
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(18),
                 border: active
                     ? Border.all(color: BrandColors.primary, width: 2)
                     : null,
@@ -494,7 +494,7 @@ class _SosReportTabState extends State<_SosReportTab> {
                           color: active
                               ? BrandColors.primary
                               : BrandColors.onSurface.withValues(alpha: 0.78),
-                          size: 34),
+                          size: 26),
                       const Spacer(),
                       Text(t.title,
                           style: GoogleFonts.plusJakartaSans(
@@ -926,7 +926,7 @@ class _SosReportTabState extends State<_SosReportTab> {
         RichText(
           text: TextSpan(
             style: GoogleFonts.plusJakartaSans(
-                fontSize: 26,
+                fontSize: 22,
                 fontWeight: FontWeight.w800,
                 color: BrandColors.onSurface),
             children: [
@@ -934,7 +934,7 @@ class _SosReportTabState extends State<_SosReportTab> {
               TextSpan(
                 text: tituloResaltado,
                 style: GoogleFonts.plusJakartaSans(
-                    fontSize: 26,
+                    fontSize: 22,
                     fontWeight: FontWeight.w800,
                     fontStyle: FontStyle.italic,
                     color: BrandColors.primary),
@@ -942,7 +942,7 @@ class _SosReportTabState extends State<_SosReportTab> {
             ],
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
         child,
       ],
     );

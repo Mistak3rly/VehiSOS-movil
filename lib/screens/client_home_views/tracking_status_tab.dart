@@ -5,12 +5,14 @@ enum _ChatMessageType { assistant, text, location, file, audio, status }
 class _TrackingStatusTab extends StatefulWidget {
   const _TrackingStatusTab({
     required this.initialToken,
+    required this.talleresApi,
     required this.onOpenNotifications,
     required this.onWorkshopAssigned,
     required this.onHistoryEvent,
   });
 
   final String initialToken;
+  final VehiSosTalleresApi talleresApi;
   final VoidCallback onOpenNotifications;
   final ValueChanged<WorkshopSuggestion> onWorkshopAssigned;
   final void Function({
@@ -30,39 +32,12 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
 
   GoogleMapController? _mapController;
 
-  final LatLng _fallbackLocation = const LatLng(19.4326, -99.1332);
-  final List<_WorkshopSeed> _workshopSeeds = const [
-    _WorkshopSeed(
-      name: 'Silverstone Auto Center',
-      address: 'Av. Reforma 102, Centro',
-      phoneNumber: '+525511100101',
-      latitude: 19.4378,
-      longitude: -99.1498,
-      rating: 4.9,
-      priceTier: 'Premium',
-      reasons: ['Fastest arrival', 'Certified tow partner', 'Open 24/7'],
-    ),
-    _WorkshopSeed(
-      name: 'Guardian Repair Hub',
-      address: 'Calle Insurgentes 880',
-      phoneNumber: '+525511100202',
-      latitude: 19.4285,
-      longitude: -99.1388,
-      rating: 4.8,
-      priceTier: 'Balanced',
-      reasons: ['Closest to you', 'Great price', 'Real-time status'],
-    ),
-    _WorkshopSeed(
-      name: 'QuickTow Express',
-      address: 'Calzada Sur 210',
-      phoneNumber: '+525511100303',
-      latitude: 19.4212,
-      longitude: -99.1214,
-      rating: 4.7,
-      priceTier: 'Budget',
-      reasons: ['Lowest cost', 'Audio updates', 'Good reviews'],
-    ),
-  ];
+  // Ubicación de fallback centrada en Santa Cruz de la Sierra, Bolivia
+  final LatLng _fallbackLocation = const LatLng(-17.7833, -63.1821);
+
+  // Talleres cargados desde el backend
+  List<TallerDisponible> _talleresBackend = const [];
+  bool _loadingTalleres = false;
 
   late LatLng _currentLocation = _fallbackLocation;
   bool _loadingLocation = true;
@@ -102,7 +77,27 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
 
   Future<void> _bootstrap() async {
     await _resolveLocation();
+    await _loadRealWorkshops();
     await _refreshRecommendations();
+  }
+
+  Future<void> _loadRealWorkshops() async {
+    setState(() => _loadingTalleres = true);
+    try {
+      final talleres = await widget.talleresApi.getTalleresActivos();
+      if (!mounted) return;
+      // Ordenar por distancia al usuario
+      talleres.sort((TallerDisponible a, TallerDisponible b) =>
+          a.distanciaKm(_currentLocation.latitude, _currentLocation.longitude)
+              .compareTo(b.distanciaKm(_currentLocation.latitude, _currentLocation.longitude)));
+      setState(() {
+        _talleresBackend = talleres;
+        _loadingTalleres = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingTalleres = false);
+    }
   }
 
   Future<void> _resolveLocation() async {
@@ -186,25 +181,29 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
   }
 
   List<WorkshopSuggestion> _buildCandidatesFor(LatLng userLocation) {
-    return _workshopSeeds.map((seed) {
-      final distanceKm = Geolocator.distanceBetween(
-            userLocation.latitude,
-            userLocation.longitude,
-            seed.latitude,
-            seed.longitude,
-          ) /
-          1000;
+    return _talleresBackend.map((TallerDisponible taller) {
+      final distanceKm = taller.distanciaKm(
+        userLocation.latitude,
+        userLocation.longitude,
+      );
+
+      final reasons = <String>[];
+      if (distanceKm < 5) { reasons.add('Muy cerca de ti'); }
+      else if (distanceKm < 15) { reasons.add('Distancia razonable'); }
+      if (taller.telefono != null) { reasons.add('Contacto directo disponible'); }
+      if (taller.capacidadMaxima > 1) { reasons.add('Alta capacidad'); }
+      if (reasons.isEmpty) reasons.add('Taller disponible');
 
       return WorkshopSuggestion(
-        name: seed.name,
-        address: seed.address,
-        distanceKm: distanceKm,
-        rating: seed.rating,
-        priceTier: seed.priceTier,
-        reasons: seed.reasons,
-        latitude: seed.latitude,
-        longitude: seed.longitude,
-        phoneNumber: seed.phoneNumber,
+        name: taller.nombre,
+        address: taller.ubicacionLabel,
+        distanceKm: distanceKm < 9000 ? distanceKm : 0.0,
+        rating: 4.5,
+        priceTier: 'Estándar',
+        reasons: reasons,
+        latitude: taller.latitud ?? userLocation.latitude,
+        longitude: taller.longitud ?? userLocation.longitude,
+        phoneNumber: taller.telefono ?? '',
         isOpen: true,
       );
     }).toList(growable: false);
@@ -1009,7 +1008,7 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
                 isRealAI ? 'Respuestas generadas por IA real' : subtitle,
                 style: GoogleFonts.workSans(
                   fontSize: 11,
-                  color: textColor.withOpacity(0.8),
+                  color: textColor.withValues(alpha: 0.8),
                 ),
               ),
             ],
@@ -1024,7 +1023,7 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.green.withOpacity(0.4),
+                    color: Colors.green.withValues(alpha: 0.4),
                     blurRadius: 6,
                     spreadRadius: 1,
                   ),
@@ -1038,27 +1037,6 @@ class _TrackingStatusTabState extends State<_TrackingStatusTab> {
   }
 }
 
-class _WorkshopSeed {
-  const _WorkshopSeed({
-    required this.name,
-    required this.address,
-    required this.phoneNumber,
-    required this.latitude,
-    required this.longitude,
-    required this.rating,
-    required this.priceTier,
-    required this.reasons,
-  });
-
-  final String name;
-  final String address;
-  final String phoneNumber;
-  final double latitude;
-  final double longitude;
-  final double rating;
-  final String priceTier;
-  final List<String> reasons;
-}
 
 class _ChatMessage {
   const _ChatMessage._({
