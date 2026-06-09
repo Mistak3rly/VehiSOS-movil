@@ -27,6 +27,16 @@ class _CotizacionesTabState extends State<CotizacionesTab> {
 
   static const _metodosPago = ['Efectivo', 'Tarjeta', 'QR', 'Transferencia'];
 
+  /// Normaliza el método de pago guardado (minúsculas) al label del dropdown.
+  String _normalizarMetodo(String? raw) {
+    if (raw == null) return _metodosPago.first;
+    final lower = raw.toLowerCase();
+    return _metodosPago.firstWhere(
+      (m) => m.toLowerCase() == lower,
+      orElse: () => _metodosPago.first,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -199,31 +209,139 @@ class _CotizacionesTabState extends State<CotizacionesTab> {
     final confirm = await showDialog<String>(
       context: context,
       builder: (ctx) {
-        String selected = c.metodoPago ?? _metodosPago.first;
+        // _normalizarMetodo garantiza que initialValue exista en la lista
+        String selected = _normalizarMetodo(c.metodoPago);
+        final cardNumCtrl = TextEditingController();
+        final cardExpCtrl = TextEditingController();
+        final cardCvvCtrl = TextEditingController();
         return StatefulBuilder(builder: (ctx, setLocal) {
+          final isQR = selected == 'QR';
+          final isTarjeta = selected == 'Tarjeta';
+          final qrData =
+              'VehiSOS|INC:${c.idIncidente}|COT:${c.id}|TOTAL:${c.totalConComision.toStringAsFixed(2)}|REF:${DateTime.now().millisecondsSinceEpoch}';
           return AlertDialog(
             title: Text('Confirmar pago',
                 style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Total: \$${c.totalConComision.toStringAsFixed(2)}',
-                    style: GoogleFonts.workSans(
-                        fontSize: 16, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  initialValue: selected,
-                  items: _metodosPago
-                      .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                      .toList(),
-                  onChanged: (v) => setLocal(() => selected = v!),
-                  decoration: const InputDecoration(
-                    labelText: 'Método de pago',
-                    border: OutlineInputBorder(),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Total
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFDECE9),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        Text('Total a pagar',
+                            style: GoogleFonts.workSans(fontSize: 12,
+                                color: BrandColors.primary)),
+                        Text('\$${c.totalConComision.toStringAsFixed(2)}',
+                            style: GoogleFonts.plusJakartaSans(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: BrandColors.primary)),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  // Selector de método
+                  DropdownButtonFormField<String>(
+                    initialValue: selected,
+                    items: _metodosPago
+                        .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                        .toList(),
+                    onChanged: (v) => setLocal(() => selected = v!),
+                    decoration: const InputDecoration(
+                      labelText: 'Método de pago',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // UI según método
+                  if (isQR) ...[
+                    Center(
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              border: Border.all(color: const Color(0xFFE5E7EB)),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: QrImageView(
+                              data: qrData,
+                              version: QrVersions.auto,
+                              size: 180,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text('Escanea para pagar',
+                              style: GoogleFonts.workSans(
+                                  fontSize: 12,
+                                  color: BrandColors.onSurface
+                                      .withValues(alpha: 0.6))),
+                          Text('Ref. Cot. #${c.id}',
+                              style: GoogleFonts.workSans(
+                                  fontSize: 11,
+                                  color: BrandColors.onSurface
+                                      .withValues(alpha: 0.4))),
+                        ],
+                      ),
+                    ),
+                  ] else if (isTarjeta) ...[
+                    Text('Datos de la tarjeta',
+                        style: GoogleFonts.workSans(
+                            fontWeight: FontWeight.w700, fontSize: 13)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: cardNumCtrl,
+                      keyboardType: TextInputType.number,
+                      maxLength: 19,
+                      decoration: const InputDecoration(
+                        labelText: 'Número de tarjeta',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.credit_card_rounded),
+                        counterText: '',
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(children: [
+                      Expanded(
+                        child: TextField(
+                          controller: cardExpCtrl,
+                          keyboardType: TextInputType.datetime,
+                          maxLength: 5,
+                          decoration: const InputDecoration(
+                            labelText: 'MM/AA',
+                            border: OutlineInputBorder(),
+                            counterText: '',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: cardCvvCtrl,
+                          keyboardType: TextInputType.number,
+                          maxLength: 4,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                            labelText: 'CVV',
+                            border: OutlineInputBorder(),
+                            counterText: '',
+                          ),
+                        ),
+                      ),
+                    ]),
+                  ],
+                ],
+              ),
             ),
             actions: [
               TextButton(
@@ -234,7 +352,8 @@ class _CotizacionesTabState extends State<CotizacionesTab> {
                 onPressed: () => Navigator.of(ctx).pop(selected),
                 style: ElevatedButton.styleFrom(
                     backgroundColor: BrandColors.primary),
-                child: const Text('Pagar', style: TextStyle(color: Colors.white)),
+                child: const Text('Pagar',
+                    style: TextStyle(color: Colors.white)),
               ),
             ],
           );
